@@ -1,6 +1,7 @@
 import typer
 from agents.geocoder import geocode_location
 from agents.poi_fetcher import fetch_pois
+from agents.description_agent import fetch_poi_description
 
 app = typer.Typer()
 
@@ -21,6 +22,18 @@ def plan_trip(destination: str):
             print(f"{i}. {poi['name']} ({poi['dist']:.0f}m away)")
     except Exception as e:
         print(f"❌ POI fetch error: {e}")
+
+    print("\n📝 Fetching detailed descriptions...")
+    for i, poi in enumerate(pois[:5], start=1):  # limit to top 5
+        try:
+            desc = fetch_poi_description(poi['id'])
+            print(f"\n{i}. {desc['name']}")
+            print(f"   📖 {desc['description']}")
+            print(f"   🔗 {desc['url']}")
+            if desc['image']:
+                print(f"   🖼️ Image: {desc['image']}")
+        except Exception as e:
+            print(f"   ⚠️ Failed to get description: {e}")
 
 @app.command()
 def veiw_trip():

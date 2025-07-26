@@ -3,6 +3,7 @@ from agents.geocoder import geocode_location
 from agents.poi_fetcher import fetch_pois
 from agents.description_agent import fetch_poi_description
 from agents.routing_agent import get_route
+from utils.map_plotter import save_route_map
 
 
 app = typer.Typer()
@@ -51,6 +52,24 @@ def plan_trip(destination: str):
             print(f"{i+1}. {step['instruction']} ({step['distance']} m, {round(step['duration'] / 60, 1)} min)")
     except Exception as e:
         print(f"❌ Routing error: {e}")
+
+    
+    # Step 1: extract coordinates in [lon, lat]
+    poi_coords = [[poi['lon'], poi['lat']] for poi in pois[:3]]
+
+    # Step 2: Get route
+    route = get_route(poi_coords, mode="foot-walking")
+
+    # Step 3: Show distance and steps
+    print(f"📏 Distance: {route['distance_km']:.2f} km")
+    print(f"⏱️ Duration: {route['duration_min']:.1f} minutes")
+    for i, step in enumerate(route['steps']):
+        print(f"{i+1}. {step['instruction']} ({step['distance']} m, {round(step['duration'] / 60, 1)} min)")
+
+    # Step 4: Generate map
+    save_route_map(route['geometry'], poi_coords)
+
+
 @app.command()
 def veiw_trip():
     print("\n📅 Viewing trip details...")

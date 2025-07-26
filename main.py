@@ -2,6 +2,8 @@ import typer
 from agents.geocoder import geocode_location
 from agents.poi_fetcher import fetch_pois
 from agents.description_agent import fetch_poi_description
+from agents.routing_agent import get_route
+
 
 app = typer.Typer()
 
@@ -35,6 +37,20 @@ def plan_trip(destination: str):
         except Exception as e:
             print(f"   ⚠️ Failed to get description: {e}")
 
+    print("\n🗺️ Calculating route through top 3 POIs...")
+    coords = [[poi['lon'], poi['lat']] for poi in pois[:3]]
+
+    print("\n🛣️ Planning fixed route through selected POIs...")
+    try:
+        route = get_route(coords)
+        print(f"📏 Total Distance: {route['distance_km']:.2f} km")
+        print(f"⏱️ Estimated Time: {route['duration_min']:.1f} min")
+
+        print("\n📍 Step-by-step directions:")
+        for i, step in enumerate(route['steps']):
+            print(f"{i+1}. {step['instruction']} ({step['distance']} m, {round(step['duration'] / 60, 1)} min)")
+    except Exception as e:
+        print(f"❌ Routing error: {e}")
 @app.command()
 def veiw_trip():
     print("\n📅 Viewing trip details...")

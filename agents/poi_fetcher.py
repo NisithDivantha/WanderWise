@@ -7,7 +7,7 @@ load_dotenv()
 API_KEY = os.getenv("OPENTRIPMAP_API_KEY")
 BASE_URL = "https://api.opentripmap.com/0.1/en/places"
 
-def fetch_pois(lat, lon, radius=5000, kinds="interesting_places", limit=10):
+def fetch_pois(lat, lon, radius=15000, kinds="interesting_places", limit=20):
     url = f"{BASE_URL}/radius"
     params = {
         'apikey': API_KEY,

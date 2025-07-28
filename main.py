@@ -202,22 +202,22 @@ def plan_trip(
         # Create a dummy route for testing
         route = {"distance_km": 5.0, "duration_min": 60, "geometry": []}
 
-    # Step 2: Budget check (using original POI data for compatibility)
-    print(f"\n💰 Evaluating budget (${budget})...")
-    budget_check = evaluate_budget(enriched_pois[:5], route["distance_km"], budget)
+    # # Step 2: Budget check (using original POI data for compatibility)
+    # print(f"\n💰 Evaluating budget (${budget})...")
+    # budget_check = evaluate_budget(enriched_pois[:5], route["distance_km"], budget)
 
-    if not budget_check["within_budget"]:
-        print(f"\n💸 Budget exceeded! Estimated cost = ${budget_check['estimated_cost']:.2f}")
-        print(f"➡️ Reducing to top {budget_check['suggested_num_pois']} POIs")
-        enriched_pois = enriched_pois[:budget_check['suggested_num_pois']]
-        poi_coords = [[poi['lon'], poi['lat']] for poi in enriched_pois]
-        try:
-            route = get_route(poi_coords, mode="foot-walking")
-            print(f"📏 Updated route distance: {route['distance_km']:.2f} km")
-        except:
-            pass  # Keep existing route if new one fails
-    else:
-        print(f"✅ Budget OK! Estimated cost: ${budget_check['estimated_cost']:.2f}")
+    # if not budget_check["within_budget"]:
+    #     print(f"\n💸 Budget exceeded! Estimated cost = ${budget_check['estimated_cost']:.2f}")
+    #     print(f"➡️ Reducing to top {budget_check['suggested_num_pois']} POIs")
+    #     enriched_pois = enriched_pois[:budget_check['suggested_num_pois']]
+    #     poi_coords = [[poi['lon'], poi['lat']] for poi in enriched_pois]
+    #     try:
+    #         route = get_route(poi_coords, mode="foot-walking")
+    #         print(f"📏 Updated route distance: {route['distance_km']:.2f} km")
+    #     except:
+    #         pass  # Keep existing route if new one fails
+    # else:
+    #     print(f"✅ Budget OK! Estimated cost: ${budget_check['estimated_cost']:.2f}")
 
     # Step 3: Save map
     print("\n🗺️ Generating route map...")

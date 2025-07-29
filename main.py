@@ -8,6 +8,7 @@ from utils.map_plotter import save_route_map
 from agents.budget_agent import evaluate_budget
 from agents.itinerary_agent import generate_day_by_day_itinerary
 from agents.llm_agent import generate_friendly_summary
+from agents.review_agent import enhance_pois_with_reviews, rank_pois_by_rating, display_poi_reviews
 
 app = typer.Typer()
 
@@ -17,7 +18,8 @@ def plan_trip(
     budget: float = 50.0, 
     start_date: str = "2025-08-01",
     use_llm: bool = True,
-    poi_limit: int = 15
+    poi_limit: int = 15,
+    use_reviews: bool = True 
 ):
     print(f"\n🔍 Enhanced Geocoding for: {destination}")
     print("   🌍 Trying Google Maps API first, Nominatim as fallback...")
@@ -59,6 +61,16 @@ def plan_trip(
     except Exception as e:
         print(f"❌ POI fetch error: {e}")
         return
+
+    if use_reviews:
+        print(f"\n⭐ Enhancing POIs with Google Maps reviews and ratings...")
+        pois = enhance_pois_with_reviews(pois[:10], destination)  # Limit to 10 for API efficiency
+        
+        # Rank POIs by rating
+        pois = rank_pois_by_rating(pois)
+        
+        print(f"\n✅ Reranked {len(pois)} POIs by Google Maps ratings")
+    
 
     print(f"\n📝 Gathering comprehensive information for top {min(5, len(pois))} POIs...")
     enriched_pois = []
@@ -122,6 +134,9 @@ def plan_trip(
                 # Use the longest description as primary
                 best_description = max(descriptions, key=len) if descriptions else "No description available."
                 sources_count = len([d for d in descriptions if d])
+            
+            if use_reviews and poi.get('google_reviews'):
+                display_poi_reviews(poi)
             
             # Get the best image source
             image_url = ''
@@ -270,7 +285,7 @@ def plan_trip(
     print(f"   🤖 LLM-generated POIs: {llm_pois}")
     print(f"   📡 API-sourced POIs: {api_pois}")
     print(f"   🎯 Data coverage: {(len([p for p in enriched_pois if p['sources_count'] > 0])/len(enriched_pois)*100):.1f}%")
-    print(f"   💰 Final budget: ${budget_check['estimated_cost']:.2f} / ${budget}")
+    # print(f"   💰 Final budget: ${budget_check['estimated_cost']:.2f} / ${budget}")
 
 @app.command()
 def plan_trip_llm_only(destination: str, budget: float = 50.0, start_date: str = "2025-08-01"):

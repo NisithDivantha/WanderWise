@@ -49,3 +49,9 @@ Groups POIs into daily schedules (e.g., 3 per day).
     - Assigns visit windows (e.g., 9am–11am, 12pm–2pm)
     - Formats output in a structured, readable itinerary format
 
+
+Quick Trip Planner
+
+Imagine you want to quickly plan a trip based on your preferences. 
+Plan is to get some inputs from you and plan a quick trip accordingly.
+not a full system that does booking hotels and all. This will just give you a plan given a place a set of attractions around that are.

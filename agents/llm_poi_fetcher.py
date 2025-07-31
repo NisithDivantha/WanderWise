@@ -398,21 +398,35 @@ def fetch_pois_with_llm(location: str, limit: int = 15) -> list:
     
     scraped_content = []
     
-    # Step 1: Try Wikipedia (more reliable than Google)
+    # Step 1: Google Search (most comprehensive)
+    print("\n🔍 Searching Google for attractions...")
+    google_content = scrape_google_custom_search(location)
+    scraped_content.extend(google_content)
+    
+    # Step 2: Wikipedia (reliable but limited)
     print("\n📚 Searching Wikipedia...")
     wiki_content = scrape_wikipedia_attractions(location)
     scraped_content.extend(wiki_content)
     
-    # Step 2: Try alternative sources
+    # Step 3: Alternative sources
     print("\n🗺️ Searching alternative sources...")
     alt_content = scrape_alternative_sources(location)
     scraped_content.extend(alt_content)
     
+    # Step 4: Travel websites (bonus content)
+    print("\n🌐 Searching travel websites...")
+    travel_content = scrape_travel_websites(location)
+    scraped_content.extend(travel_content)
+    
     print(f"✅ Collected {len(scraped_content)} pieces of content")
+    print(f"   🔍 Google: {len(google_content)} entries")
+    print(f"   📚 Wikipedia: {len(wiki_content)} entries") 
+    print(f"   🗺️ Alternative: {len(alt_content)} entries")
+    print(f"   🌐 Travel sites: {len(travel_content)} entries")
     
-    # Step 3: Generate POIs using Gemini (without coordinates)
+    # Continue with existing Gemini generation...
     poi_data = generate_pois_using_gemini(location, scraped_content)
-    
+        
     # Fallback if Gemini fails
     if not poi_data.get('pois'):
         print("🔄 Gemini approach failed, trying fallback...")
@@ -536,3 +550,94 @@ def fetch_pois_hybrid(lat: float, lon: float, location_name: str,
     print(f"   📡 OpenTripMap POIs: {len(otm_pois)}")
     
     return unique_pois[:limit]
+
+def scrape_google_custom_search(location: str) -> list:
+    """Use Google Custom Search API for more reliable results"""
+    google_cse_key = os.getenv("GOOGLE_CSE_API_KEY")  # Different from Maps API
+    google_cse_id = os.getenv("GOOGLE_CSE_ID")
+    
+    if not google_cse_key or not google_cse_id:
+        print("   ⚠️ Google Custom Search API not configured, skipping...")
+        return []
+    
+    google_data = []
+    
+    try:
+        search_queries = [
+            f"{location} tourist attractions",
+            f"{location} things to do", 
+            f"best places visit {location}"
+        ]
+        
+        for query in search_queries:
+            try:
+                url = "https://www.googleapis.com/customsearch/v1"
+                params = {
+                    'key': google_cse_key,
+                    'cx': google_cse_id,
+                    'q': query,
+                    'num': 5
+                }
+                
+                print(f"🔍 Google CSE: {query}")
+                response = requests.get(url, params=params, timeout=10)
+                data = response.json()
+                
+                for item in data.get('items', []):
+                    title = item.get('title', '')
+                    snippet = item.get('snippet', '')
+                    if snippet:
+                        google_data.append(f"Google: {title} - {snippet}")
+                
+                time.sleep(1)  # API rate limiting
+                
+            except Exception as e:
+                print(f"   ❌ Google CSE error: {e}")
+                continue
+    except Exception as e:
+        print(f"❌ Google CSE setup error: {e}")
+    
+    return google_data
+
+def scrape_travel_websites(location: str) -> list:
+    """Scrape popular travel websites for location info"""
+    travel_data = []
+    
+    try:
+        # Travel website searches
+        travel_sites = [
+            f"https://www.tripadvisor.com/Tourism-g{location.replace(' ', '_')}-Vacations.html",
+            f"https://www.lonelyplanet.com/search?q={quote(location)}",
+            f"https://www.timeoutcom/search?q={quote(location)}"
+        ]
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        }
+        
+        # Simple content extraction (be respectful of rate limits)
+        for site_url in travel_sites[:1]:  # Just try one for now
+            try:
+                print(f"🌐 Checking travel sites for {location}")
+                response = requests.get(site_url, headers=headers, timeout=10)
+                
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    
+                    # Extract text content (basic approach)
+                    paragraphs = soup.find_all('p')
+                    for p in paragraphs[:5]:
+                        text = p.get_text(strip=True)
+                        if len(text) > 100 and location.lower() in text.lower():
+                            travel_data.append(f"Travel Site: {text}")
+                
+                time.sleep(3)  # Respectful rate limiting
+                
+            except Exception as e:
+                print(f"   ❌ Travel site scraping failed: {e}")
+                continue
+                
+    except Exception as e:
+        print(f"❌ Travel sites error: {e}")
+    
+    return travel_data

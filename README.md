@@ -91,3 +91,12 @@ test-hotels - Test hotel suggestions
 ✅ Route planning and map generation
 ✅ Day-by-day itinerary generation
 ✅ Enhanced trip summaries
+
+# Interactive mode
+python main.py plan-interactive
+
+# Command line mode  
+python main.py plan-trip "Paris" --vacation-type cultural_exploration --budget 150 --start-date 2025-08-10
+
+# Test hotels
+python main.py test-hotels "Paris" --budget 120 --vacation-type cultural_exploration

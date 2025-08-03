@@ -11,7 +11,7 @@ def configure_gemini():
         raise ValueError("GEMINI_API_KEY not found in environment variables")
     
     genai.configure(api_key=api_key)
-    return genai.GenerativeModel('gemini-pro')
+    return genai.GenerativeModel('gemini-1.5-flash')
 
 def find_hotels_google_places(destination: str, lat: float, lon: float, budget: float = 100.0) -> List[Dict]:
     """Find hotels using Google Places API"""

@@ -641,3 +641,301 @@ def scrape_travel_websites(location: str) -> list:
         print(f"❌ Travel sites error: {e}")
     
     return travel_data
+
+def fetch_pois_hybrid_with_preferences(lat: float, lon: float, destination: str, vacation_preferences: dict, limit: int = 15) -> list:
+    """
+    Hybrid POI fetching with vacation type preferences
+    Combines OpenTripMap API with LLM-based discovery, filtered by vacation preferences
+    """
+    from .poi_fetcher import fetch_pois
+    
+    print(f"\n🎯 Fetching POIs with {vacation_preferences.get('description', 'mixed')} preferences")
+    
+    all_pois = []
+    
+    # Step 1: Get OpenTripMap POIs filtered by categories
+    print("📡 Step 1: Fetching from OpenTripMap API...")
+    try:
+        poi_categories = vacation_preferences.get('poi_categories', ['interesting_places'])
+        # Convert categories to OpenTripMap 'kinds' format
+        otm_kinds = []
+        for category in poi_categories:
+            if category == 'museums':
+                otm_kinds.extend(['museums', 'cultural'])
+            elif category == 'historic':
+                otm_kinds.extend(['historic', 'heritage'])
+            elif category == 'natural':
+                otm_kinds.extend(['natural', 'geological'])
+            elif category == 'entertainment':
+                otm_kinds.extend(['amusements', 'entertainment'])
+            elif category == 'religious':
+                otm_kinds.extend(['religion'])
+            elif category == 'architecture':
+                otm_kinds.extend(['architecture'])
+            else:
+                otm_kinds.append(category)
+        
+        # Remove duplicates
+        otm_kinds = list(set(otm_kinds))
+        
+        otm_pois = fetch_pois(lat, lon, kinds=otm_kinds)
+        print(f"   ✅ OpenTripMap: {len(otm_pois)} POIs")
+        all_pois.extend(otm_pois)
+        
+    except Exception as e:
+        print(f"   ❌ OpenTripMap error: {e}")
+    
+    # Step 2: Get LLM POIs with preferences
+    print("🤖 Step 2: LLM-based POI discovery with preferences...")
+    try:
+        # Create preference-aware prompt
+        keywords = vacation_preferences.get('keywords', [])
+        avoid_keywords = vacation_preferences.get('avoid_keywords', [])
+        
+        llm_pois = fetch_pois_with_llm_preferences(
+            destination, 
+            keywords=keywords,
+            avoid_keywords=avoid_keywords,
+            description=vacation_preferences.get('description', ''),
+            limit=max(5, limit - len(all_pois))
+        )
+        print(f"   ✅ LLM Discovery: {len(llm_pois)} POIs")
+        all_pois.extend(llm_pois)
+        
+    except Exception as e:
+        print(f"   ❌ LLM POI discovery error: {e}")
+    
+    # Step 3: Filter and deduplicate
+    print("🔍 Step 3: Filtering and deduplicating...")
+    
+    # Remove duplicates by name similarity
+    unique_pois = remove_duplicate_pois(all_pois)
+    
+    # Apply keyword filtering
+    filtered_pois = filter_pois_by_preferences(unique_pois, vacation_preferences)
+    
+    # Limit results
+    final_pois = filtered_pois[:limit]
+    
+    print(f"✅ Final result: {len(final_pois)} unique, preference-matched POIs")
+    
+    return final_pois
+
+def fetch_pois_with_llm_preferences(destination: str, keywords: list = [], avoid_keywords: list = [], description: str = "", limit: int = 10) -> list:
+    """
+    Fetch POIs using LLM with specific vacation preferences
+    """
+    if not GEMINI_API_KEY:
+        print("⚠️ GEMINI_API_KEY not found, skipping LLM POI discovery")
+        return []
+    
+    try:
+        model = genai.GenerativeModel('gemini-pro')
+        
+        # Build preference-aware prompt
+        keyword_text = f"Focus on: {', '.join(keywords)}" if keywords else ""
+        avoid_text = f"Avoid: {', '.join(avoid_keywords)}" if avoid_keywords else ""
+        description_text = f"Type of vacation: {description}" if description else ""
+        
+        prompt = f"""Find the top {limit} must-visit attractions and points of interest in {destination}.
+
+{description_text}
+{keyword_text}
+{avoid_text}
+
+For each attraction, provide:
+1. Name
+2. Brief description (2-3 sentences)
+3. Why it's worth visiting
+4. Category (e.g., museum, park, historic site, etc.)
+5. Estimated visit duration
+6. Best time to visit
+7. Approximate entrance fee (if any)
+8. Accessibility information
+
+Focus on places that match the vacation preferences mentioned above.
+Provide a diverse mix but prioritize based on the preferences.
+Format as a numbered list with clear separation between attractions."""
+
+        response = model.generate_content(prompt)
+        pois_text = response.text
+        
+        # Create POI data structure similar to generate_pois_using_gemini
+        poi_data = {
+            'pois': parse_preference_llm_response(pois_text),
+            'source': 'llm_preferences'
+        }
+        
+        # Enhance POIs with coordinates using existing function
+        enhanced_pois = enhance_pois_with_coordinates(poi_data['pois'], destination)
+        
+        # Format output similar to fetch_pois_with_llm
+        formatted_pois = []
+        geocoded_count = 0
+        
+        for i, poi in enumerate(enhanced_pois[:limit]):
+            # Use geocoded coordinates if available
+            coord_info = poi.get('geocoding_info', {})
+            if coord_info.get('geocoded', False):
+                lat, lon = coord_info['lat'], coord_info['lon']
+                geocoded_count += 1
+            else:
+                # Use zero coordinates for failed geocoding
+                lat, lon = 0.0, 0.0
+            
+            formatted_poi = {
+                'id': f"llm_{destination.replace(' ', '_').replace(',', '')}_{i}",
+                'name': poi.get('name', 'Unknown'),
+                'lat': lat,
+                'lon': lon,
+                'kind': poi.get('category', 'unknown'),
+                'dist': i * 100,
+                'llm_data': {
+                    'description': poi.get('description', ''),
+                    'category': poi.get('category', 'unknown'),
+                    'visit_duration': poi.get('estimated_visit_duration', 'unknown'),
+                    'significance': poi.get('significance', 'medium'),
+                    'tags': poi.get('tags', []),
+                    'best_time': poi.get('best_time_to_visit', 'any time'),
+                    'entrance_fee': poi.get('entrance_fee', 'unknown'),
+                    'accessibility': poi.get('accessibility', 'unknown'),
+                    'geocoded': coord_info.get('geocoded', False),
+                    'geocoding_source': coord_info.get('source', 'unknown'),
+                    'geocoding_query': coord_info.get('query_used', 'N/A')
+                }
+            }
+            formatted_pois.append(formatted_poi)
+        
+        return formatted_pois
+        
+    except Exception as e:
+        print(f"❌ LLM preferences POI fetch error: {e}")
+        return []
+
+def filter_pois_by_preferences(pois: list, vacation_preferences: dict) -> list:
+    """
+    Filter POIs based on vacation preferences keywords
+    """
+    keywords = [k.lower() for k in vacation_preferences.get('keywords', [])]
+    avoid_keywords = [k.lower() for k in vacation_preferences.get('avoid_keywords', [])]
+    
+    if not keywords and not avoid_keywords:
+        return pois  # No filtering needed
+    
+    filtered_pois = []
+    
+    for poi in pois:
+        poi_text = f"{poi.get('name', '')} {poi.get('description', '')} {poi.get('kind', '')}"
+        poi_text_lower = poi_text.lower()
+        
+        # Check avoid keywords first
+        if avoid_keywords:
+            should_avoid = any(avoid_word in poi_text_lower for avoid_word in avoid_keywords)
+            if should_avoid:
+                continue
+        
+        # Check positive keywords
+        if keywords:
+            has_keyword = any(keyword in poi_text_lower for keyword in keywords)
+            if has_keyword:
+                filtered_pois.append(poi)
+        else:
+            # If no positive keywords specified, include if not avoided
+            filtered_pois.append(poi)
+    
+    return filtered_pois
+
+def remove_duplicate_pois(pois: list) -> list:
+    """
+    Remove duplicate POIs based on name similarity
+    """
+    unique_pois = []
+    seen_names = set()
+    
+    for poi in pois:
+        name = poi.get('name', '').lower().strip()
+        
+        # Simple deduplication - could be improved with fuzzy matching
+        if name and name not in seen_names:
+            seen_names.add(name)
+            unique_pois.append(poi)
+    
+    return unique_pois
+
+def parse_preference_llm_response(response_text: str) -> list:
+    """
+    Parse LLM response for preference-based POI discovery
+    """
+    pois = []
+    
+    # Split response into potential POI entries
+    lines = response_text.split('\n')
+    current_poi = {}
+    poi_counter = 0
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Check if this is a new POI (numbered list)
+        if line.startswith(tuple(f"{i}." for i in range(1, 21))):
+            # Save previous POI if it exists
+            if current_poi.get('name'):
+                pois.append(current_poi)
+            
+            # Start new POI
+            poi_counter += 1
+            poi_name = line.split('.', 1)[1].strip()
+            
+            current_poi = {
+                'name': poi_name,
+                'description': '',
+                'category': 'attraction',
+                'estimated_visit_duration': '1-2 hours',
+                'significance': 'medium',
+                'tags': [],
+                'best_time_to_visit': 'any time',
+                'entrance_fee': 'unknown',
+                'accessibility': 'unknown'
+            }
+        
+        # Extract specific information from subsequent lines
+        elif current_poi:
+            line_lower = line.lower()
+            
+            # Description (usually the first few lines after the name)
+            if not current_poi.get('description') or len(current_poi['description']) < 50:
+                if not any(keyword in line_lower for keyword in ['category:', 'duration:', 'fee:', 'time:', 'access:']):
+                    current_poi['description'] += ' ' + line
+            
+            # Category
+            if 'category:' in line_lower or 'type:' in line_lower:
+                current_poi['category'] = line.split(':', 1)[1].strip()
+            
+            # Visit duration
+            if 'duration:' in line_lower or 'visit time:' in line_lower or 'time needed:' in line_lower:
+                current_poi['estimated_visit_duration'] = line.split(':', 1)[1].strip()
+            
+            # Best time to visit
+            if 'best time:' in line_lower or 'when to visit:' in line_lower:
+                current_poi['best_time_to_visit'] = line.split(':', 1)[1].strip()
+            
+            # Entrance fee
+            if 'fee:' in line_lower or 'cost:' in line_lower or 'price:' in line_lower:
+                current_poi['entrance_fee'] = line.split(':', 1)[1].strip()
+            
+            # Accessibility
+            if 'accessibility:' in line_lower or 'access:' in line_lower:
+                current_poi['accessibility'] = line.split(':', 1)[1].strip()
+    
+    # Don't forget the last POI
+    if current_poi.get('name'):
+        pois.append(current_poi)
+    
+    # Clean up descriptions
+    for poi in pois:
+        if poi.get('description'):
+            poi['description'] = poi['description'].strip()
+    
+    return pois

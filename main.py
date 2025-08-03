@@ -1,26 +1,81 @@
 import typer
-from agents.geocoder import geocode_location  # This now uses Google Maps + Nominatim fallback
-from agents.poi_fetcher import fetch_pois  # Keep original for fallback
-from agents.llm_poi_fetcher import fetch_pois_hybrid, fetch_pois_with_llm
+from agents.geocoder import geocode_location
+from agents.poi_fetcher import fetch_pois
+from agents.llm_poi_fetcher import fetch_pois_hybrid, fetch_pois_with_llm, fetch_pois_hybrid_with_preferences
 from agents.description_agent import gather_poi_information, extract_all_content_for_llm
 from agents.routing_agent import get_route
 from utils.map_plotter import save_route_map
-from agents.budget_agent import evaluate_budget
 from agents.itinerary_agent import generate_day_by_day_itinerary
 from agents.llm_agent import generate_friendly_summary
 from agents.review_agent import enhance_pois_with_reviews, rank_pois_by_rating, display_poi_reviews
+from agents.user_inputs import get_user_preferences_interactive, get_user_preferences_args, display_user_preferences
+from agents.hotel_agent import suggest_hotels, display_hotel_recommendations
 
 app = typer.Typer()
+
+@app.command()
+def plan_interactive():
+    """Interactive trip planning with user preferences"""
+    print("🌟 Welcome to Interactive AI Travel Planner!")
+    
+    # Get user preferences interactively
+    user_prefs = get_user_preferences_interactive()
+    if not user_prefs:
+        print("❌ Failed to get user preferences. Exiting...")
+        return
+    
+    # Display preferences summary
+    display_user_preferences(user_prefs)
+    
+    # Confirm before proceeding
+    if not typer.confirm("\n✅ Proceed with trip planning?", default=True):
+        print("👋 Trip planning cancelled. Goodbye!")
+        return
+    
+    # Plan the trip using the preferences
+    plan_trip_with_preferences(user_prefs)
 
 @app.command()
 def plan_trip(
     destination: str, 
     budget: float = 50.0, 
     start_date: str = "2025-08-01",
+    end_date: str = None,
+    vacation_type: str = "mixed",
     use_llm: bool = True,
     poi_limit: int = 15,
-    use_reviews: bool = True 
+    use_reviews: bool = True,
+    include_hotels: bool = True
 ):
+    """Plan trip with command line arguments"""
+    
+    # Convert arguments to user preferences format
+    user_prefs = get_user_preferences_args(
+        destination=destination,
+        vacation_type=vacation_type,
+        start_date=start_date,
+        end_date=end_date,
+        budget=budget,
+        include_hotels=include_hotels,
+        poi_limit=poi_limit
+    )
+    
+    # Display preferences summary
+    display_user_preferences(user_prefs)
+    
+    # Plan the trip
+    plan_trip_with_preferences(user_prefs, use_llm=use_llm, use_reviews=use_reviews)
+
+def plan_trip_with_preferences(user_prefs: dict, use_llm: bool = True, use_reviews: bool = True):
+    """Main trip planning function that uses user preferences"""
+    destination = user_prefs['destination']
+    budget = user_prefs['budget']
+    vacation_type = user_prefs['vacation_type']
+    vacation_preferences = user_prefs['vacation_preferences']
+    travel_dates = user_prefs['travel_dates']
+    poi_limit = user_prefs['poi_limit']
+    include_hotels = user_prefs['include_hotels']
+    
     print(f"\n🔍 Enhanced Geocoding for: {destination}")
     print("   🌍 Trying Google Maps API first, Nominatim as fallback...")
     
@@ -35,14 +90,17 @@ def plan_trip(
         print("💡 Tip: Make sure GOOGLE_MAPS_API_KEY is set in your .env file")
         return
 
-    print(f"\n📌 Fetching points of interest {'with LLM enhancement' if use_llm else 'from OpenTripMap only'}...")
+    print(f"\n📌 Fetching points of interest for {vacation_type} vacation...")
+    print(f"   🎯 Looking for: {vacation_preferences['description']}")
+    
     try:
         if use_llm:
-            # Use hybrid approach (OpenTripMap + LLM web scraping)
-            pois = fetch_pois_hybrid(
+            # Use hybrid approach with vacation type preferences
+            pois = fetch_pois_hybrid_with_preferences(
                 geo_info['lat'], 
                 geo_info['lon'], 
                 destination,
+                vacation_preferences,
                 limit=poi_limit
             )
         else:
@@ -50,7 +108,7 @@ def plan_trip(
             pois = fetch_pois(
                 geo_info['lat'], 
                 geo_info['lon'], 
-                kinds=["interesting_places", "sport"]
+                kinds=vacation_preferences.get('poi_categories', ["interesting_places"])
             )
         
         print(f"\n✅ Found {len(pois)} POIs:")
@@ -71,6 +129,17 @@ def plan_trip(
         
         print(f"\n✅ Reranked {len(pois)} POIs by Google Maps ratings")
     
+    # Get hotel recommendations if requested
+    if include_hotels:
+        print(f"\n🏨 Finding hotel recommendations...")
+        hotels = suggest_hotels(
+            destination, 
+            geo_info['lat'], 
+            geo_info['lon'], 
+            vacation_type, 
+            budget
+        )
+        display_hotel_recommendations(hotels)
 
     print(f"\n📝 Gathering comprehensive information for top {min(5, len(pois))} POIs...")
     enriched_pois = []
@@ -217,24 +286,7 @@ def plan_trip(
         # Create a dummy route for testing
         route = {"distance_km": 5.0, "duration_min": 60, "geometry": []}
 
-    # # Step 2: Budget check (using original POI data for compatibility)
-    # print(f"\n💰 Evaluating budget (${budget})...")
-    # budget_check = evaluate_budget(enriched_pois[:5], route["distance_km"], budget)
-
-    # if not budget_check["within_budget"]:
-    #     print(f"\n💸 Budget exceeded! Estimated cost = ${budget_check['estimated_cost']:.2f}")
-    #     print(f"➡️ Reducing to top {budget_check['suggested_num_pois']} POIs")
-    #     enriched_pois = enriched_pois[:budget_check['suggested_num_pois']]
-    #     poi_coords = [[poi['lon'], poi['lat']] for poi in enriched_pois]
-    #     try:
-    #         route = get_route(poi_coords, mode="foot-walking")
-    #         print(f"📏 Updated route distance: {route['distance_km']:.2f} km")
-    #     except:
-    #         pass  # Keep existing route if new one fails
-    # else:
-    #     print(f"✅ Budget OK! Estimated cost: ${budget_check['estimated_cost']:.2f}")
-
-    # Step 3: Save map
+    # Step 2: Save map
     print("\n🗺️ Generating route map...")
     try:
         save_route_map(route["geometry"], poi_coords)
@@ -242,11 +294,12 @@ def plan_trip(
     except Exception as e:
         print(f"⚠️ Map generation error: {e}")
 
-    # Step 4: Generate itinerary
+    # Step 3: Generate itinerary
+    start_date = travel_dates['start_date']
     print(f"\n📅 Generating itinerary starting {start_date}...")
     itinerary = generate_day_by_day_itinerary(enriched_pois, start_date)
 
-    # Step 5: Display enhanced itinerary
+    # Step 4: Display enhanced itinerary
     print("\n🗓️  Enhanced Trip Itinerary")
     print("=" * 50)
     
@@ -285,7 +338,16 @@ def plan_trip(
     print(f"   🤖 LLM-generated POIs: {llm_pois}")
     print(f"   📡 API-sourced POIs: {api_pois}")
     print(f"   🎯 Data coverage: {(len([p for p in enriched_pois if p['sources_count'] > 0])/len(enriched_pois)*100):.1f}%")
-    # print(f"   💰 Final budget: ${budget_check['estimated_cost']:.2f} / ${budget}")
+    
+    # Final summary
+    duration_days = travel_dates['duration_days']
+    print(f"\n🎉 Trip Planning Complete!")
+    print(f"   📍 Destination: {destination}")
+    print(f"   📅 Duration: {duration_days} days ({travel_dates['start_date']} to {travel_dates['end_date']})")
+    print(f"   🎯 Vacation type: {vacation_type.replace('_', ' ').title()}")
+    print(f"   💰 Daily budget: ${budget}")
+    print(f"   🏨 Hotels: {'Included' if include_hotels else 'Not requested'}")
+    print(f"   📍 POIs found: {len(enriched_pois)}")
 
 @app.command()
 def plan_trip_llm_only(destination: str, budget: float = 50.0, start_date: str = "2025-08-01"):
@@ -312,8 +374,15 @@ def plan_trip_llm_only(destination: str, budget: float = 50.0, start_date: str =
         # Continue with similar logic as main plan_trip but skip OpenTripMap data gathering
         print(f"\n✅ Planning trip with {len(pois)} LLM-discovered POIs")
         
-        # Call the main planning function with LLM-only POIs
-        plan_trip(destination, budget, start_date, use_llm=True, poi_limit=len(pois))
+        # Create user preferences for LLM-only mode
+        user_prefs = get_user_preferences_args(
+            destination=destination,
+            budget=budget,
+            start_date=start_date
+        )
+        
+        # Call the main planning function
+        plan_trip_with_preferences(user_prefs, use_llm=True)
         
     except Exception as e:
         print(f"❌ LLM-only planning failed: {e}")
@@ -335,9 +404,29 @@ def test_geocoding(location: str):
         print("💡 Tip: Make sure GOOGLE_MAPS_API_KEY is set in your .env file")
 
 @app.command()
-def view_trip():
-    print("\n📅 Viewing trip details...")
-    print("Trip details are currently not implemented.")
+def test_hotels(destination: str, budget: float = 100.0, vacation_type: str = "mixed"):
+    """Test hotel suggestions functionality"""
+    print(f"\n🧪 Testing Hotel Suggestions for: {destination}")
+    print("=" * 50)
+    
+    try:
+        # Get coordinates first
+        geo_info = geocode_location(destination)
+        print(f"📍 Coordinates: {geo_info['lat']}, {geo_info['lon']}")
+        
+        # Test hotel suggestions
+        hotels = suggest_hotels(
+            destination, 
+            geo_info['lat'], 
+            geo_info['lon'], 
+            vacation_type, 
+            budget
+        )
+        
+        display_hotel_recommendations(hotels)
+        
+    except Exception as e:
+        print(f"❌ Hotel testing failed: {e}")
 
 if __name__ == "__main__":
     app()

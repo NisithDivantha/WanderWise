@@ -1,4 +1,4 @@
-# LangChain Travel Planner Orchestration
+# WanderWise: AI-Powered Travel Planner
 
 ## Overview
 

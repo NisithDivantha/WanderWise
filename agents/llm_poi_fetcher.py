@@ -730,7 +730,7 @@ def fetch_pois_with_llm_preferences(destination: str, keywords: list = [], avoid
         return []
     
     try:
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         # Build preference-aware prompt
         keyword_text = f"Focus on: {', '.join(keywords)}" if keywords else ""

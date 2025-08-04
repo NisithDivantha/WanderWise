@@ -19,7 +19,7 @@ from agents.hotel_agent import suggest_hotels
 from agents.review_agent import enhance_pois_with_reviews, rank_pois_by_rating
 from agents.description_agent import gather_poi_information
 from agents.routing_agent import get_route
-from agents.itinerary_agent import generate_day_by_day_itinerary
+from agents.itinerary_agent import generate_day_by_day_itinerary, generate_smart_itinerary_with_llm
 from agents.llm_agent import generate_friendly_summary
 
 
@@ -268,14 +268,27 @@ class ItineraryGenerationTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the itinerary generation tool."""
         try:
-            from datetime import datetime, timedelta
-            start_date = datetime.now().strftime("%Y-%m-%d")
-            itinerary = generate_day_by_day_itinerary(pois, start_date)
+            # Try smart LLM-based itinerary first
+            itinerary = generate_smart_itinerary_with_llm(
+                pois=pois, 
+                hotels=hotels, 
+                duration=duration,
+                interests="general tourism",  # This could be passed from user input
+                budget_range="moderate"
+            )
+            
             if run_manager:
-                run_manager.on_text(f"Generated {duration}-day itinerary", verbose=True)
+                run_manager.on_text(f"Generated {duration}-day intelligent itinerary", verbose=True)
             return itinerary
         except Exception as e:
-            return {"error": f"Itinerary generation failed: {str(e)}"}
+            # Fallback to basic itinerary
+            try:
+                from datetime import datetime
+                start_date = datetime.now().strftime("%Y-%m-%d")
+                itinerary = generate_day_by_day_itinerary(pois, start_date)
+                return itinerary
+            except Exception as fallback_error:
+                return {"error": f"Itinerary generation failed: {str(e)}, Fallback error: {str(fallback_error)}"}
 
 
 class FinalSummaryInput(BaseModel):

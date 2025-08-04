@@ -316,11 +316,26 @@ class FinalSummaryTool(BaseTool):
             if isinstance(itinerary, dict) and itinerary:
                 summary_parts = [f"Travel summary for {location}:"]
                 
-                # Process the itinerary structure
-                for day, day_info in itinerary.items():
-                    if isinstance(day_info, list):
-                        activities = [str(activity) for activity in day_info]
-                        summary_parts.append(f"{day}: {', '.join(activities[:3])}")
+                # Process the itinerary structure - LLM format has day keys directly
+                for day_key, day_activities in itinerary.items():
+                    if isinstance(day_activities, list) and day_activities:
+                        # Format activities in a more readable way
+                        activity_summaries = []
+                        for activity in day_activities[:3]:  # Show first 3 activities
+                            if isinstance(activity, dict):
+                                activity_name = activity.get('activity', activity.get('name', 'Unknown'))
+                                time_slot = activity.get('time', '')
+                                if time_slot:
+                                    activity_summaries.append(f"{time_slot} - {activity_name}")
+                                else:
+                                    activity_summaries.append(activity_name)
+                            else:
+                                activity_summaries.append(str(activity))
+                        
+                        if activity_summaries:
+                            summary_parts.append(f"{day_key}: {'; '.join(activity_summaries)}")
+                            if len(day_activities) > 3:
+                                summary_parts[-1] += f" (and {len(day_activities) - 3} more activities)"
                 
                 summary = "\n".join(summary_parts)
             else:

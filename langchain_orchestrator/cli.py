@@ -126,14 +126,25 @@ class TravelPlannerCLI:
         # Itinerary
         itinerary = state.get("itinerary", {})
         if itinerary:
-            days = itinerary.get("days", [])
-            print(f"\n📅 Itinerary: {len(days)} days planned")
-            for day in days[:2]:  # Show first 2 days
-                day_num = day.get("day", "Unknown")
-                activities = day.get("activities", [])
-                print(f"   Day {day_num}: {len(activities)} activities")
-            if len(days) > 2:
-                print(f"   ... and {len(days) - 2} more days")
+            # Handle LLM-generated itinerary format
+            day_count = len([k for k in itinerary.keys() if k.startswith('Day')])
+            print(f"\n📅 Itinerary: {day_count} days planned")
+            
+            # Show first 2 days with some activities
+            sorted_days = sorted(itinerary.items())
+            for i, (day_key, activities) in enumerate(sorted_days[:2]):
+                if isinstance(activities, list):
+                    print(f"   {day_key}: {len(activities)} activities")
+                    if activities:
+                        first_activity = activities[0]
+                        if isinstance(first_activity, dict):
+                            activity_name = first_activity.get('activity', first_activity.get('name', 'Unknown'))
+                            time_slot = first_activity.get('time', '')
+                            preview = f"{time_slot} - {activity_name}" if time_slot else activity_name
+                            print(f"     → {preview}")
+            
+            if day_count > 2:
+                print(f"   ... and {day_count - 2} more days")
         
         # Final summary
         final_summary = state.get("final_summary")
@@ -191,13 +202,33 @@ class TravelPlannerCLI:
                 # Itinerary
                 itinerary = state.get("itinerary", {})
                 if itinerary:
-                    days = itinerary.get("days", [])
-                    f.write(f"Day-by-Day Itinerary ({len(days)} days):\n")
-                    for day in days:
-                        f.write(f"\nDay {day.get('day', 'Unknown')}:\n")
-                        activities = day.get("activities", [])
-                        for activity in activities:
-                            f.write(f"  - {activity}\n")
+                    # Handle LLM-generated itinerary format (day keys directly in dict)
+                    day_count = len([k for k in itinerary.keys() if k.startswith('Day')])
+                    f.write(f"Day-by-Day Itinerary ({day_count} days):\n")
+                    
+                    # Sort days to ensure proper order
+                    sorted_days = sorted(itinerary.items())
+                    
+                    for day_key, activities in sorted_days:
+                        if isinstance(activities, list):
+                            f.write(f"\n{day_key}:\n")
+                            for activity in activities:
+                                if isinstance(activity, dict):
+                                    time_slot = activity.get('time', '')
+                                    activity_name = activity.get('activity', activity.get('name', 'Unknown'))
+                                    description = activity.get('description', '')
+                                    
+                                    if time_slot:
+                                        f.write(f"  {time_slot} - {activity_name}\n")
+                                    else:
+                                        f.write(f"  - {activity_name}\n")
+                                    
+                                    if description:
+                                        f.write(f"    {description}\n")
+                                else:
+                                    f.write(f"  - {activity}\n")
+                else:
+                    f.write("Day-by-Day Itinerary (0 days):\n")
             
             # Generate map if route available
             route = state.get("route", {})

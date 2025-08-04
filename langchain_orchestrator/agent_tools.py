@@ -19,7 +19,7 @@ from agents.hotel_agent import suggest_hotels
 from agents.review_agent import enhance_pois_with_reviews, rank_pois_by_rating
 from agents.description_agent import gather_poi_information
 from agents.routing_agent import get_route
-from agents.itinerary_agent import generate_day_by_day_itinerary
+from agents.itinerary_agent import generate_day_by_day_itinerary, generate_smart_itinerary_with_llm
 from agents.llm_agent import generate_friendly_summary
 
 
@@ -268,14 +268,27 @@ class ItineraryGenerationTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the itinerary generation tool."""
         try:
-            from datetime import datetime, timedelta
-            start_date = datetime.now().strftime("%Y-%m-%d")
-            itinerary = generate_day_by_day_itinerary(pois, start_date)
+            # Try smart LLM-based itinerary first
+            itinerary = generate_smart_itinerary_with_llm(
+                pois=pois, 
+                hotels=hotels, 
+                duration=duration,
+                interests="general tourism",  # This could be passed from user input
+                budget_range="moderate"
+            )
+            
             if run_manager:
-                run_manager.on_text(f"Generated {duration}-day itinerary", verbose=True)
+                run_manager.on_text(f"Generated {duration}-day intelligent itinerary", verbose=True)
             return itinerary
         except Exception as e:
-            return {"error": f"Itinerary generation failed: {str(e)}"}
+            # Fallback to basic itinerary
+            try:
+                from datetime import datetime
+                start_date = datetime.now().strftime("%Y-%m-%d")
+                itinerary = generate_day_by_day_itinerary(pois, start_date)
+                return itinerary
+            except Exception as fallback_error:
+                return {"error": f"Itinerary generation failed: {str(e)}, Fallback error: {str(fallback_error)}"}
 
 
 class FinalSummaryInput(BaseModel):
@@ -303,11 +316,26 @@ class FinalSummaryTool(BaseTool):
             if isinstance(itinerary, dict) and itinerary:
                 summary_parts = [f"Travel summary for {location}:"]
                 
-                # Process the itinerary structure
-                for day, day_info in itinerary.items():
-                    if isinstance(day_info, list):
-                        activities = [str(activity) for activity in day_info]
-                        summary_parts.append(f"{day}: {', '.join(activities[:3])}")
+                # Process the itinerary structure - LLM format has day keys directly
+                for day_key, day_activities in itinerary.items():
+                    if isinstance(day_activities, list) and day_activities:
+                        # Format activities in a more readable way
+                        activity_summaries = []
+                        for activity in day_activities[:3]:  # Show first 3 activities
+                            if isinstance(activity, dict):
+                                activity_name = activity.get('activity', activity.get('name', 'Unknown'))
+                                time_slot = activity.get('time', '')
+                                if time_slot:
+                                    activity_summaries.append(f"{time_slot} - {activity_name}")
+                                else:
+                                    activity_summaries.append(activity_name)
+                            else:
+                                activity_summaries.append(str(activity))
+                        
+                        if activity_summaries:
+                            summary_parts.append(f"{day_key}: {'; '.join(activity_summaries)}")
+                            if len(day_activities) > 3:
+                                summary_parts[-1] += f" (and {len(day_activities) - 3} more activities)"
                 
                 summary = "\n".join(summary_parts)
             else:

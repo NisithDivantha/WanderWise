@@ -2,13 +2,43 @@
 
 ## Overview
 
-This enhanced version of the Travel Planner integrates LangChain to provide advanced orchestration capabilities including:
+WanderWise is a sophisticated multi-agent travel planning system that provides intelligent, personalized travel recommendations using advanced AI orchestration. The system now offers multiple interfaces including CLI, web API, and a beautiful web interface.
 
-- **Parallel Agent Execution**: POI and hotel fetching agents run simultaneously
-- **Agent Communication**: Shared memory and message passing between agents
-- **Real-time Monitoring**: Track agent performance and execution status
-- **Enhanced Error Handling**: Robust failure recovery and error reporting
-- **Performance Metrics**: Detailed timing and execution statistics
+### Key Features
+
+- **Multi-Agent Architecture**: Specialized agents for geocoding, POI discovery, hotel recommendations, and itinerary generation
+- **LangChain Orchestration**: Advanced agent coordination with parallel execution and shared memory
+- **AI-Powered Itinerary**: Smart day-by-day planning using Google Gemini or open-source LLMs
+- **FastAPI Web Interface**: Complete RESTful API with interactive documentation and web UI
+- **Docker Ready**: Containerized deployment with Docker and Docker Compose
+- **Flexible LLM Support**: Google Gemini integration with fallback to open-source models
+
+## Quick Start
+
+### Web API (Recommended)
+
+```bash
+# Install dependencies
+pip install -r requirements_fastapi.txt
+
+# Start the web server
+python start_api.py
+```
+
+Then visit:
+- **Web Interface**: http://localhost:8000/web
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+
+### Command Line Interface
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run with LangChain orchestration
+python main_langchain.py "Paris, France" "2024-06-01" "2024-06-03"
+```
 
 ## Architecture
 
@@ -133,6 +163,74 @@ status = orchestrator.get_real_time_status()
 print(status)
 "
 ```
+
+## Interfaces
+
+### 1. FastAPI Web Application
+
+The most user-friendly way to use WanderWise:
+
+```bash
+# Start the web server
+python start_api.py
+
+# Or using uvicorn directly
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+**Available Endpoints:**
+- `POST /generate-travel-plan` - Generate complete travel plans
+- `GET /destinations` - List processed destinations
+- `GET /download/{file_type}` - Download generated files
+- `GET /web` - Interactive web interface
+- `GET /docs` - API documentation (Swagger UI)
+- `GET /health` - Health check
+
+### 2. Command Line Interface
+
+For developers and automation:
+
+```bash
+# Interactive mode (recommended)
+python main_langchain.py --interactive
+
+# Direct command mode
+python main_langchain.py "Tokyo, Japan" "2024-06-01" "2024-06-03"
+```
+
+### 3. Python API Client
+
+For programmatic integration:
+
+```python
+from api.client_example import TravelPlannerClient
+
+client = TravelPlannerClient()
+result = client.generate_travel_plan(
+    destination="Rome, Italy",
+    start_date="2024-06-01",
+    end_date="2024-06-03",
+    use_llm=True
+)
+```
+
+## Deployment
+
+### Docker Deployment
+
+```bash
+# Using Docker Compose (recommended)
+docker-compose up --build
+
+# Using Docker directly
+docker build -t wanderwise .
+docker run -p 8000:8000 -e GEMINI_API_KEY="your-key" wanderwise
+```
+
+### Environment Variables
+
+- `GEMINI_API_KEY` - Google Gemini API key (optional, uses fallback if not set)
+- `GOOGLE_MAPS_API_KEY` - Google Maps API key (optional)
 
 ## Features
 

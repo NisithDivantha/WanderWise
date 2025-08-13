@@ -68,3 +68,43 @@ def get_api_key_from_bearer(credentials: Optional[HTTPAuthorizationCredentials] 
     if credentials:
         return credentials.credentials
     return None
+
+async def get_current_user(
+    api_key_header: Optional[str] = Depends(get_api_key_from_header),
+    api_key_query: Optional[str] = Depends(get_api_key_from_query),
+    api_key_bearer: Optional[str] = Depends(get_api_key_from_bearer)
+) -> dict:
+    """
+    Get current authenticated user from various API key sources.
+    Checks header, query parameter, and bearer token in that order.
+    """
+    
+    # Try different sources for API key
+    api_key = api_key_header or api_key_query or api_key_bearer
+    
+    if not api_key:
+        raise HTTPException(
+            status_code=401,
+            detail="API key required. Provide via X-API-Key header, api_key query parameter, or Authorization Bearer token.",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    user = verify_api_key(api_key)
+    if not user:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid API key"
+        )
+    
+    return user
+
+async def get_optional_user(
+    api_key_header: Optional[str] = Depends(get_api_key_from_header),
+    api_key_query: Optional[str] = Depends(get_api_key_from_query),
+    api_key_bearer: Optional[str] = Depends(get_api_key_from_bearer)
+) -> Optional[dict]:
+    """Get user if API key is provided, but don't require it."""
+    api_key = api_key_header or api_key_query or api_key_bearer
+    if api_key:
+        return verify_api_key(api_key)
+    return None

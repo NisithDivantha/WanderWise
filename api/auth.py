@@ -163,3 +163,11 @@ async def check_rate_limit(user: dict = Depends(get_current_user)) -> dict:
     user["rate_limit_remaining"] = remaining
     
     return user
+
+def generate_api_key() -> str:
+    """Generate a new API key."""
+    return f"wanderwise_{''.join(secrets.choice('abcdefghijklmnopqrstuvwxyz0123456789') for _ in range(32))}"
+
+def hash_api_key(api_key: str) -> str:
+    """Hash an API key for secure storage."""
+    return hashlib.sha256(api_key.encode()).hexdigest()

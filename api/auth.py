@@ -55,3 +55,16 @@ def verify_api_key(api_key: str) -> dict:
     # To be extended to check database, JWT tokens, etc.
     return None
 
+def get_api_key_from_header(api_key_header: Optional[str] = Security(api_key_header)) -> Optional[str]:
+    """Extract API key from header."""
+    return api_key_header
+
+def get_api_key_from_query(api_key_query: Optional[str] = Security(api_key_query)) -> Optional[str]:
+    """Extract API key from query parameter."""
+    return api_key_query
+
+def get_api_key_from_bearer(credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_security)) -> Optional[str]:
+    """Extract API key from Bearer token."""
+    if credentials:
+        return credentials.credentials
+    return None

@@ -6,7 +6,7 @@ It exposes the existing LangChain-orchestrated travel planning functionality
 as RESTful API endpoints.
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Query, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -29,6 +29,7 @@ from api.models import (
     ItineraryActivity
 )
 from api.web_interface import add_web_interface
+from api.auth import get_current_user, get_optional_user, check_rate_limit, auth_config
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -175,9 +176,17 @@ async def health_check():
 
 
 @app.post("/generate-travel-plan", response_model=TravelPlanResponse)
-async def generate_travel_plan(request: TravelPlanRequest):
+async def generate_travel_plan(
+    request: TravelPlanRequest,
+    user: dict = Depends(check_rate_limit)
+):
     """
     Generate a complete travel plan for the specified destination and dates.
+    
+    Requires API key authentication via:
+    - X-API-Key header
+    - api_key query parameter  
+    - Authorization Bearer token
     
     This endpoint orchestrates multiple AI agents to:
     - Find points of interest
@@ -329,8 +338,51 @@ async def download_file(
         )
 
 
+@app.get("/auth/info")
+async def get_auth_info(user: dict = Depends(get_current_user)):
+    """Get information about the authenticated user."""
+    return {
+        "user_id": user["user_id"],
+        "tier": user["tier"],
+        "rate_limit": user["rate_limit"],
+        "rate_limit_remaining": user.get("rate_limit_remaining", user["rate_limit"])
+    }
+
+
+@app.get("/auth/generate-key")
+async def generate_new_api_key():
+    """Generate a new API key (for development/demo purposes)."""
+    from api.auth import generate_api_key
+    new_key = generate_api_key()
+    
+    return {
+        "api_key": new_key,
+        "message": "New API key generated. Add this to your API_KEYS environment variable to activate it.",
+        "usage": {
+            "header": f"X-API-Key: {new_key}",
+            "query": f"?api_key={new_key}",
+            "bearer": f"Authorization: Bearer {new_key}"
+        }
+    }
+
+
+# Add rate limit headers to responses
+@app.middleware("http")
+async def add_rate_limit_headers(request, call_next):
+    """Add rate limiting headers to responses."""
+    response = await call_next(request)
+    
+    # Only add headers for authenticated endpoints
+    if hasattr(request.state, "user") and request.state.user:
+        user = request.state.user
+        response.headers["X-RateLimit-Limit"] = str(user["rate_limit"])
+        response.headers["X-RateLimit-Remaining"] = str(user.get("rate_limit_remaining", user["rate_limit"]))
+    
+    return response
+
+
 @app.get("/destinations")
-async def list_destinations():
+async def list_destinations(user: Optional[dict] = Depends(get_optional_user)):
     """
     List all destinations that have been processed.
     """

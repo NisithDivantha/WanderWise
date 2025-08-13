@@ -108,3 +108,58 @@ async def get_optional_user(
     if api_key:
         return verify_api_key(api_key)
     return None
+
+# Rate limiting (simple in-memory implementation)
+import time
+from collections import defaultdict
+
+class RateLimiter:
+    """Simple in-memory rate limiter."""
+    
+    def __init__(self):
+        self.requests = defaultdict(list)
+    
+    def is_allowed(self, user_id: str, limit: int, window: int = 3600) -> bool:
+        """Check if user is within rate limit."""
+        now = time.time()
+        user_requests = self.requests[user_id]
+        
+        # Remove old requests outside the window
+        user_requests[:] = [req_time for req_time in user_requests if now - req_time < window]
+        
+        if len(user_requests) >= limit:
+            return False
+        
+        # Add current request
+        user_requests.append(now)
+        return True
+    
+    def get_remaining(self, user_id: str, limit: int, window: int = 3600) -> int:
+        """Get remaining requests for user."""
+        now = time.time()
+        user_requests = self.requests[user_id]
+        user_requests[:] = [req_time for req_time in user_requests if now - req_time < window]
+        return max(0, limit - len(user_requests))
+
+rate_limiter = RateLimiter()
+
+async def check_rate_limit(user: dict = Depends(get_current_user)) -> dict:
+    """Check rate limit for authenticated user."""
+    user_id = user["user_id"]
+    limit = user["rate_limit"]
+    
+    if not rate_limiter.is_allowed(user_id, limit):
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Maximum {limit} requests per hour.",
+            headers={
+                "X-RateLimit-Limit": str(limit),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(int(time.time() + 3600))
+            }
+        )
+    
+    remaining = rate_limiter.get_remaining(user_id, limit)
+    user["rate_limit_remaining"] = remaining
+    
+    return user

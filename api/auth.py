@@ -37,3 +37,21 @@ class AuthConfig:
         self.premium_keys = [key.strip() for key in self.premium_keys if key.strip()]
 
 auth_config = AuthConfig()
+
+def verify_api_key(api_key: str) -> dict:
+    """Verify an API key and return user info."""
+    if not api_key:
+        return None
+    
+    # Check if it's a valid master key
+    if api_key in auth_config.master_keys:
+        return {
+            "valid": True,
+            "user_id": "master",
+            "tier": "premium" if api_key in auth_config.premium_keys else "standard",
+            "rate_limit": auth_config.rate_limit_requests
+        }
+    
+    # To be extended to check database, JWT tokens, etc.
+    return None
+

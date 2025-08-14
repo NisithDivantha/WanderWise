@@ -1,9 +1,8 @@
-import { create } from 'zustand'
-import { subscribeWithSelector } from 'zustand/middleware'
+import { createStore } from 'zustand/vanilla'
 import { TravelPlan, TravelPlanRequest, LoadingState, NotificationState, APIKeyInfo } from '@/types/api'
 import { generateId } from '@/lib/utils'
 
-interface AppState {
+export interface AppState {
   // Loading state
   loading: LoadingState
   setLoading: (loading: LoadingState) => void
@@ -39,18 +38,36 @@ interface AppState {
   setSidebarOpen: (open: boolean) => void
   theme: 'light' | 'dark'
   setTheme: (theme: 'light' | 'dark') => void
+  
+  // Hydration flag for SSR
+  _hasHydrated: boolean
+  setHasHydrated: (state: boolean) => void
 }
 
-// Create the store with SSR handling
-export const useAppStore = create<AppState>()(
-  subscribeWithSelector((set, get) => ({
+const initialState = {
+  loading: { isLoading: false },
+  notifications: [],
+  apiKey: null,
+  apiKeyInfo: null,
+  currentPlan: null,
+  savedPlans: [],
+  currentRequest: null,
+  sidebarOpen: false,
+  theme: 'light' as const,
+  _hasHydrated: false,
+}
+
+export type AppStore = ReturnType<typeof createAppStore>
+
+export const createAppStore = () => {
+  return createStore<AppState>()((set, get) => ({
+    ...initialState,
+    
     // Loading state
-    loading: { isLoading: false },
     setLoading: (loading) => set({ loading }),
     clearLoading: () => set({ loading: { isLoading: false } }),
 
     // Notifications
-    notifications: [],
     addNotification: (notification) => {
       const newNotification: NotificationState = {
         ...notification,
@@ -76,15 +93,11 @@ export const useAppStore = create<AppState>()(
     clearNotifications: () => set({ notifications: [] }),
 
     // API Key management
-    apiKey: null,
-    apiKeyInfo: null,
     setApiKey: (key) => set({ apiKey: key }),
     setApiKeyInfo: (info) => set({ apiKeyInfo: info }),
     clearApiKey: () => set({ apiKey: null, apiKeyInfo: null }),
 
     // Travel plans
-    currentPlan: null,
-    savedPlans: [],
     setCurrentPlan: (plan) => set({ currentPlan: plan }),
     savePlan: (plan) => {
       const planWithId = {
@@ -113,69 +126,13 @@ export const useAppStore = create<AppState>()(
     clearSavedPlans: () => set({ savedPlans: [] }),
 
     // Form state
-    currentRequest: null,
     setCurrentRequest: (request) => set({ currentRequest: request }),
 
     // UI state
-    sidebarOpen: false,
     setSidebarOpen: (open) => set({ sidebarOpen: open }),
-    theme: 'light',
     setTheme: (theme) => set({ theme }),
+    
+    // Hydration
+    setHasHydrated: (state) => set({ _hasHydrated: state }),
   }))
-)
-
-// Convenience hooks for specific parts of the store
-// Using individual selectors to avoid object recreation issues
-export const useLoading = () => {
-  const loading = useAppStore((state) => state.loading)
-  const setLoading = useAppStore((state) => state.setLoading)
-  const clearLoading = useAppStore((state) => state.clearLoading)
-  
-  return { loading, setLoading, clearLoading }
-}
-
-export const useNotifications = () => {
-  const notifications = useAppStore((state) => state.notifications)
-  const addNotification = useAppStore((state) => state.addNotification)
-  const removeNotification = useAppStore((state) => state.removeNotification)
-  const clearNotifications = useAppStore((state) => state.clearNotifications)
-  
-  return { notifications, addNotification, removeNotification, clearNotifications }
-}
-
-export const useApiKey = () => {
-  const apiKey = useAppStore((state) => state.apiKey)
-  const apiKeyInfo = useAppStore((state) => state.apiKeyInfo)
-  const setApiKey = useAppStore((state) => state.setApiKey)
-  const setApiKeyInfo = useAppStore((state) => state.setApiKeyInfo)
-  const clearApiKey = useAppStore((state) => state.clearApiKey)
-  
-  return { apiKey, apiKeyInfo, setApiKey, setApiKeyInfo, clearApiKey }
-}
-
-export const useTravelPlans = () => {
-  const currentPlan = useAppStore((state) => state.currentPlan)
-  const savedPlans = useAppStore((state) => state.savedPlans)
-  const setCurrentPlan = useAppStore((state) => state.setCurrentPlan)
-  const savePlan = useAppStore((state) => state.savePlan)
-  const removeSavedPlan = useAppStore((state) => state.removeSavedPlan)
-  const clearSavedPlans = useAppStore((state) => state.clearSavedPlans)
-  
-  return { currentPlan, savedPlans, setCurrentPlan, savePlan, removeSavedPlan, clearSavedPlans }
-}
-
-export const useFormState = () => {
-  const currentRequest = useAppStore((state) => state.currentRequest)
-  const setCurrentRequest = useAppStore((state) => state.setCurrentRequest)
-  
-  return { currentRequest, setCurrentRequest }
-}
-
-export const useUI = () => {
-  const sidebarOpen = useAppStore((state) => state.sidebarOpen)
-  const setSidebarOpen = useAppStore((state) => state.setSidebarOpen)
-  const theme = useAppStore((state) => state.theme)
-  const setTheme = useAppStore((state) => state.setTheme)
-  
-  return { sidebarOpen, setSidebarOpen, theme, setTheme }
 }

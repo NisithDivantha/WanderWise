@@ -31,19 +31,11 @@ export default function Home() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          {isClient && apiKey ? (
-            <Link href="/plan">
-              <Button size="lg" className="text-lg px-8 py-4">
-                Start Planning
-              </Button>
-            </Link>
-          ) : (
-            <Link href="/setup">
-              <Button size="lg" className="text-lg px-8 py-4">
-                Get Started - Setup API
-              </Button>
-            </Link>
-          )}
+          <Link href="/plan-trip">
+            <Button size="lg" className="text-lg px-8 py-4">
+              🚀 Plan Your Trip
+            </Button>
+          </Link>
           
           <Link href="/destinations">
             <Button variant="outline" size="lg" className="text-lg px-8 py-4">

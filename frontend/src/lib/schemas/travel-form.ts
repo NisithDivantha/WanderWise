@@ -28,7 +28,7 @@ export const travelFormSchema = z.object({
   
   // Step 3: Additional Options
   accommodation: z.enum(['hotel', 'hostel', 'airbnb', 'mixed']).optional(),
-  transportation: z.enum(['walking', 'public', 'taxi', 'rental']).optional(),
+  transportation: z.array(z.enum(['walking', 'public', 'taxi', 'rental'])).optional(),
   specialRequirements: z.string().optional(),
 }).refine((data) => {
   const start = new Date(data.startDate)

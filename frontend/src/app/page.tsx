@@ -37,9 +37,9 @@ export default function Home() {
             </Button>
           </Link>
           
-          <Link href="/destinations">
+          <Link href="/my-plans">
             <Button variant="outline" size="lg" className="text-lg px-8 py-4">
-              Browse Destinations
+              📋 My Plans
             </Button>
           </Link>
         </div>

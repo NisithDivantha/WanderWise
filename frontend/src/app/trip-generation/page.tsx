@@ -7,6 +7,7 @@ import { GenerationProgress } from '@/components/ui/generation-progress'
 import { TravelPlanResults } from '@/components/ui/travel-plan-results'
 import { NotificationContainer } from '@/components/ui/notification-container'
 import { useTravelPlanStore } from '@/lib/stores/travel-plan-store'
+import { usePlanManagementStore } from '../../lib/stores/plan-management-store'
 import { tripGenerationService } from '@/lib/services/trip-generation'
 import { TravelPlanRequest, TravelPlan } from '@/types/api'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,7 @@ export default function TripGenerationPage() {
     resetGeneration 
   } = useTravelPlanStore()
   
+  const { savePlan } = usePlanManagementStore()
   const { addNotification } = useNotificationStore()
 
   const handleFormSubmit = async (formData: TravelFormData) => {
@@ -46,11 +48,15 @@ export default function TripGenerationPage() {
       // Switch to results view
       setCurrentView('results')
 
+      // Automatically save the plan
+      const planName = `${result.destination} Adventure`
+      const savedPlanId = savePlan(result, planName)
+
       // Show success notification
       addNotification({
         type: 'success',
-        title: 'Trip Generated Successfully!',
-        message: `Your ${result.duration_days}-day ${result.destination} adventure is ready.`,
+        title: 'Trip Generated & Saved!',
+        message: `Your ${result.duration_days}-day ${result.destination} adventure is ready and saved to your plans.`,
         duration: 5000
       })
 

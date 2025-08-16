@@ -31,7 +31,7 @@ export default function Home() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Link href="/plan-trip">
+          <Link href="/trip-generation">
             <Button size="lg" className="text-lg px-8 py-4">
               🚀 Plan Your Trip
             </Button>

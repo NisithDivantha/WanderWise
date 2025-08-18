@@ -1,21 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { TravelFormData } from '@/lib/schemas/travel-form'
 import { TravelPlanningForm } from '@/components/forms/travel-planning-form'
 import { GenerationProgress } from '@/components/ui/generation-progress'
 import { TravelPlanResults } from '@/components/ui/travel-plan-results'
 import { NotificationContainer } from '@/components/ui/notification-container'
+import { APIKeyManager } from '@/components/api/api-key-manager'
 import { useTravelPlanStore } from '@/lib/stores/travel-plan-store'
 import { usePlanManagementStore } from '../../lib/stores/plan-management-store'
 import { tripGenerationService } from '@/lib/services/trip-generation'
 import { TravelPlanRequest, TravelPlan } from '@/types/api'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Settings } from 'lucide-react'
 import { useNotificationStore } from '../../lib/stores/notification-store'
 
 export default function TripGenerationPage() {
-  const [currentView, setCurrentView] = useState<'form' | 'generating' | 'results'>('form')
+  const [currentView, setCurrentView] = useState<'form' | 'generating' | 'results' | 'api-setup'>('form')
+  const [isApiKeyValid, setIsApiKeyValid] = useState(false)
+  const [showApiSetup, setShowApiSetup] = useState(false)
   
   const { 
     isGenerating, 
@@ -27,164 +30,180 @@ export default function TripGenerationPage() {
   const { savePlan } = usePlanManagementStore()
   const { addNotification } = useNotificationStore()
 
-  const handleFormSubmit = async (formData: TravelFormData) => {
-    try {
-      // Convert form data to API request format
-      const request: TravelPlanRequest = {
-        destination: formData.destination,
-        start_date: formData.startDate,
-        end_date: formData.endDate,
-        interests: formData.interests,
-        budget: formData.budget as 'low' | 'medium' | 'high',
-        group_size: 1 // Default for now
-      }
+  useEffect(() => {
+    // Check if API key is already configured and set it in the client
+    const savedKey = localStorage.getItem('wanderwise_api_key')
+    if (savedKey) {
+      // API key exists, no need to change view since we start with 'form'
+      setIsApiKeyValid(true)
+    }
+  }, [])
 
-      // Switch to generation view
-      setCurrentView('generating')
-
-      // Start the generation process
-      const result = await tripGenerationService.generateTravelPlan(request)
-
-      // Switch to results view
-      setCurrentView('results')
-
-      // Automatically save the plan
-      const planName = `${result.destination} Adventure`
-      const savedPlanId = savePlan(result, planName)
-
-      // Show success notification
+  const handleApiKeyValidation = (isValid: boolean) => {
+    setIsApiKeyValid(isValid)
+    if (isValid && currentView === 'api-setup') {
+      setCurrentView('form')
       addNotification({
         type: 'success',
-        title: 'Trip Generated & Saved!',
-        message: `Your ${result.duration_days}-day ${result.destination} adventure is ready and saved to your plans.`,
+        title: 'Connected!',
+        message: 'Successfully connected to WanderWise API. You can now generate travel plans.',
+        duration: 3000
+      })
+    }
+  }
+
+  const handleFormSubmit = async (data: TravelFormData) => {
+    try {
+      setCurrentView('generating')
+      
+      const request: TravelPlanRequest = {
+        destination: data.destination,
+        start_date: data.startDate,
+        end_date: data.endDate,
+        interests: data.interests,
+        budget: data.budget as 'low' | 'medium' | 'high',
+        group_size: 1
+      }
+
+      const result = await tripGenerationService.generateTravelPlan(request)
+      
+      // Auto-save the generated plan
+      const savedPlanId = savePlan(result, `${result.destination} Adventure`)
+
+      addNotification({
+        type: 'success',
+        title: 'Trip Generated!',
+        message: 'Your personalized travel plan has been created and saved.',
         duration: 5000
       })
 
+      setCurrentView('results')
     } catch (error) {
-      console.error('Trip generation failed:', error)
-      
-      // Show error notification
+      console.error('Trip generation error:', error)
       addNotification({
         type: 'error',
         title: 'Generation Failed',
-        message: error instanceof Error ? error.message : 'Something went wrong. Please try again.',
-        duration: 8000
+        message: error instanceof Error ? error.message : 'Failed to generate travel plan',
+        duration: 5000
       })
+      setCurrentView('form')
+    }
+  }
 
-      // Stay on generation view to show error state
+  const handleSavePlan = (plan: TravelPlan) => {
+    savePlan(plan, `${plan.destination} Trip`)
+
+    addNotification({
+      type: 'success',
+      title: 'Plan Saved!',
+      message: 'Your travel plan has been saved to your collection.',
+      duration: 3000
+    })
+  }
+
+  const handleSharePlan = (plan: TravelPlan) => {
+    // Create a shareable URL or copy to clipboard
+    const shareData = {
+      title: `Travel Plan: ${plan.destination}`,
+      text: `Check out this amazing travel plan for ${plan.destination}!`,
+      url: window.location.href
+    }
+
+    if (navigator.share) {
+      navigator.share(shareData)
+    } else {
+      navigator.clipboard.writeText(window.location.href)
+      addNotification({
+        type: 'success',
+        title: 'Link Copied!',
+        message: 'The trip link has been copied to your clipboard.',
+        duration: 3000
+      })
+    }
+  }
+
+  const handleDownloadPlan = (plan: TravelPlan, format: 'json' | 'txt') => {
+    const content = format === 'json' 
+      ? JSON.stringify(plan, null, 2)
+      : formatPlanAsText(plan)
+    
+    const blob = new Blob([content], { type: format === 'json' ? 'application/json' : 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `travel-plan-${plan.destination.replace(/\s+/g, '-').toLowerCase()}.${format}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    addNotification({
+      type: 'success',
+      title: 'Download Started!',
+      message: `Your travel plan has been downloaded as ${format.toUpperCase()}.`,
+      duration: 3000
+    })
+  }
+
+  const formatPlanAsText = (plan: TravelPlan): string => {
+    let text = `Travel Plan: ${plan.destination}\n`
+    text += `Duration: ${plan.start_date} to ${plan.end_date}\n\n`
+    text += `Summary:\n${plan.executive_summary}\n\n`
+    
+    if (plan.itinerary.length > 0) {
+      text += 'Itinerary:\n'
+      plan.itinerary.forEach((day, index) => {
+        text += `\nDay ${index + 1} (${day.date}):\n`
+        day.activities.forEach(activity => {
+          text += `  ${activity.time}: ${activity.activity}\n`
+        })
+      })
+    }
+    
+    return text
+  }
+
+  const handleGoBack = () => {
+    if (currentView === 'results') {
+      setCurrentView('form')
+    } else if (currentView === 'generating') {
+      resetGeneration()
+      setCurrentView('form')
+    } else if (currentView === 'api-setup') {
+      setCurrentView('form')
     }
   }
 
   const handleStartOver = () => {
     resetGeneration()
     setCurrentView('form')
-    
-    addNotification({
-      type: 'info',
-      title: 'Starting Fresh',
-      message: 'Ready to plan your next adventure!',
-      duration: 3000
-    })
-  }
-
-  const handleSavePlan = (plan: TravelPlan) => {
-    // In a real app, this would save to user account or local storage
-    addNotification({
-      type: 'success',
-      title: 'Plan Saved',
-      message: 'Your travel plan has been saved to your account.',
-      duration: 3000
-    })
-  }
-
-  const handleSharePlan = (plan: TravelPlan) => {
-    // In a real app, this would generate a shareable link
-    navigator.clipboard.writeText(window.location.href)
-    
-    addNotification({
-      type: 'success',
-      title: 'Link Copied',
-      message: 'Shareable link copied to clipboard!',
-      duration: 3000
-    })
-  }
-
-  const handleDownloadPlan = async (plan: TravelPlan, format: 'json' | 'txt') => {
-    try {
-      // In a real app, this would call the download API
-      const dataStr = JSON.stringify(plan, null, 2)
-      const dataBlob = new Blob([dataStr], { type: 'application/json' })
-      const url = URL.createObjectURL(dataBlob)
-      
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `travel-plan-${plan.destination}-${plan.start_date}.${format}`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      
-      URL.revokeObjectURL(url)
-      
-      addNotification({
-        type: 'success',
-        title: 'Download Started',
-        message: `Your travel plan is being downloaded as ${format.toUpperCase()}.`,
-        duration: 3000
-      })
-    } catch (error) {
-      addNotification({
-        type: 'error',
-        title: 'Download Failed',
-        message: 'Could not download the travel plan. Please try again.',
-        duration: 5000
-      })
-    }
-  }
-
-  const handleGoBack = () => {
-    if (currentView === 'results') {
-      setCurrentView('generating')
-    } else if (currentView === 'generating') {
-      setCurrentView('form')
-    }
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold text-gray-900">
-                ✈️ WanderWise
-              </h1>
-              
-              {/* Navigation breadcrumbs */}
-              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-500">
-                <span className={currentView === 'form' ? 'text-blue-600 font-medium' : ''}>
-                  Plan
+      <div className="container mx-auto px-4 py-8">
+        {/* Header with Navigation */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Trip Generation</h1>
+              <div className="flex items-center gap-2 mt-2 text-sm text-gray-600">
+                {/* Breadcrumb */}
+                <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                  Step 1: Plan
                 </span>
-                {currentView !== 'form' && (
-                  <>
-                    <span>→</span>
-                    <span className={currentView === 'generating' ? 'text-blue-600 font-medium' : ''}>
-                      Generate
-                    </span>
-                  </>
-                )}
-                {currentView === 'results' && (
-                  <>
-                    <span>→</span>
-                    <span className="text-blue-600 font-medium">Results</span>
-                  </>
-                )}
+                <span className={currentView === 'generating' ? 'px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium' : ''}>
+                  Step 2: Generate
+                </span>
+                <span className={currentView === 'results' ? 'px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium' : ''}>
+                  Step 3: Review
+                </span>
               </div>
             </div>
 
             {/* Action buttons */}
             <div className="flex items-center gap-2">
-              {currentView !== 'form' && (
+              {currentView !== 'api-setup' && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -196,9 +215,9 @@ export default function TripGenerationPage() {
                 </Button>
               )}
               
-              {(currentView === 'generating' || currentView === 'results') && (
+              {currentView !== 'api-setup' && (
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={handleStartOver}
                   className="flex items-center gap-2"
@@ -207,63 +226,113 @@ export default function TripGenerationPage() {
                   Start Over
                 </Button>
               )}
+              
+              {currentView !== 'api-setup' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowApiSetup(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  API Settings
+                </Button>
+              )}
             </div>
           </div>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* API Setup View */}
+        {currentView === 'api-setup' && (
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                WanderWise API Access
+              </h2>
+              <p className="text-lg text-gray-600 mb-4">
+                Generate API keys to integrate WanderWise travel planning into your applications.
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 max-w-2xl mx-auto mb-6">
+                <p className="text-sm text-amber-700">
+                  <strong>Note:</strong> API keys are for developers who want to integrate our service. 
+                  Regular users can use the website directly without an API key!
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setCurrentView('form')}
+                className="mb-6"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Trip Planning
+              </Button>
+            </div>
+            
+            <APIKeyManager onKeyValid={handleApiKeyValidation} />
+          </div>
+        )}
+
+        {/* API Setup Modal */}
+        {showApiSetup && currentView !== 'api-setup' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold">API Settings</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowApiSetup(false)}
+                >
+                  ✕
+                </Button>
+              </div>
+              <APIKeyManager onKeyValid={handleApiKeyValidation} />
+            </div>
+          </div>
+        )}
+
+        {/* Form View */}
         {currentView === 'form' && (
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-gray-900 mb-4">
                 Plan Your Perfect Trip
               </h2>
-              <p className="text-lg text-gray-600">
-                Tell us about your dream destination and preferences, and we'll create a personalized travel itinerary just for you.
+              <p className="text-lg text-gray-600 mb-4">
+                Tell us about your dream destination and preferences, and we&apos;ll create a personalized travel itinerary just for you.
               </p>
+              
+              {/* Developer API Access Notice */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto">
+                <p className="text-sm text-blue-700 mb-2">
+                  💡 <strong>Developers:</strong> Want to integrate travel planning into your app?
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentView('api-setup')}
+                  className="text-blue-600 border-blue-300 hover:bg-blue-100"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Get API Access
+                </Button>
+              </div>
             </div>
             
             <TravelPlanningForm onSubmit={handleFormSubmit} />
           </div>
         )}
 
+        {/* Generation Progress View */}
         {currentView === 'generating' && (
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                Creating Your Adventure
-              </h2>
-              <p className="text-lg text-gray-600">
-                Sit back and relax while we craft the perfect travel plan for you. This won't take long!
-              </p>
-            </div>
-            
             <GenerationProgress />
-            
-            {error && (
-              <div className="mt-8 text-center">
-                <Button onClick={handleStartOver} className="flex items-center gap-2 mx-auto">
-                  <RefreshCw className="w-4 h-4" />
-                  Try Again
-                </Button>
-              </div>
-            )}
           </div>
         )}
 
+        {/* Results View */}
         {currentView === 'results' && currentPlan && (
-          <div>
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                Your Adventure Awaits! 🎉
-              </h2>
-              <p className="text-lg text-gray-600">
-                Here's your personalized travel plan. You can save, share, or download it anytime.
-              </p>
-            </div>
-            
+          <div className="max-w-6xl mx-auto">
             <TravelPlanResults
               plan={currentPlan}
               onSave={handleSavePlan}
@@ -272,9 +341,21 @@ export default function TripGenerationPage() {
             />
           </div>
         )}
-      </main>
 
-      {/* Notifications */}
+        {/* Error state */}
+        {error && (
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+              <h3 className="text-lg font-medium text-red-900 mb-2">Generation Failed</h3>
+              <p className="text-red-700 mb-4">{error}</p>
+              <Button onClick={handleStartOver}>
+                Try Again
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <NotificationContainer />
     </div>
   )

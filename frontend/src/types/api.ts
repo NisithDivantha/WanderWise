@@ -11,67 +11,69 @@ export interface TravelPlanRequest {
 
 export interface PointOfInterest {
   name: string;
-  description: string;
   rating: number;
-  address: string;
-  category: string;
-  coordinates?: {
-    lat: number;
-    lng: number;
-  };
+  description?: string;
+  category?: string;
+  address?: string;
   opening_hours?: string;
   price_level?: number;
-  photos?: string[];
+  coordinates?: {
+    lat?: number;
+    lng?: number;
+  };
 }
 
 export interface Hotel {
   name: string;
-  rating: number;
-  price_range: string;
-  address: string;
-  amenities: string[];
-  description: string;
+  price?: string;
+  rating?: number;
+  description?: string;
+  price_range?: string;
+  address?: string;
+  amenities?: string[];
   booking_url?: string;
-  coordinates?: {
-    lat: number;
-    lng: number;
-  };
-  photos?: string[];
 }
 
 export interface ItineraryDay {
-  day: number;
   date: string;
-  activities: Activity[];
+  day?: number;
   theme?: string;
+  activities: Activity[];
   estimated_budget?: string;
 }
 
 export interface Activity {
   time: string;
   activity: string;
-  location: string;
+  description?: string;
+  location?: string;
   duration?: string;
   notes?: string;
-  category?: string;
+}
+
+export interface TravelPlanSummary {
+  theme?: string;
+  estimated_budget?: string;
+  highlights?: string[];
+  travel_tips?: string[];
 }
 
 export interface TravelPlan {
   destination: string;
   start_date: string;
   end_date: string;
-  duration_days: number;
+  executive_summary: string;
   points_of_interest: PointOfInterest[];
   hotels: Hotel[];
   itinerary: ItineraryDay[];
-  summary: {
-    theme: string;
-    highlights: string[];
-    estimated_budget: string;
-    best_time_to_visit: string;
-    travel_tips: string[];
-  };
-  generated_at: string;
+  generation_timestamp: string;
+  file_paths: Record<string, string>;
+  
+  // Optional summary data (may be derived from executive_summary)
+  summary?: TravelPlanSummary;
+  
+  // Computed properties for compatibility
+  duration_days?: number;
   plan_id?: string;
 }
 

@@ -22,8 +22,8 @@ export class TripGenerationService {
       // Start the generation process
       store.startGeneration(request)
       
-      // Simulate real-time progress updates
-      await this.simulateProgressUpdates()
+      // Start progress updates in background (non-blocking)
+      const progressPromise = this.simulateProgressUpdates()
       
       // Convert form data to API format
       const apiRequest: TravelPlanRequest = {
@@ -35,8 +35,16 @@ export class TripGenerationService {
         group_size: 1 // Default for now, can be made configurable
       }
       
-      // Make the actual API call
-      const result = await apiClient.generateTravelPlan(apiRequest)
+      // Check if we have an API key to determine which endpoint to use
+      const hasApiKey = typeof window !== 'undefined' && localStorage.getItem('wanderwise_api_key')
+      
+      // Make the actual API call (this is the real backend call)
+      const result = hasApiKey 
+        ? await apiClient.generateTravelPlan(apiRequest)
+        : await apiClient.generateTravelPlanPublic(apiRequest)
+      
+      // Ensure progress simulation completes
+      await progressPromise
       
       // Complete the generation
       store.completeGeneration(result)

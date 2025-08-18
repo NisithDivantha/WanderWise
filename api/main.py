@@ -273,6 +273,87 @@ async def generate_travel_plan(
         )
 
 
+@app.post("/public/generate-travel-plan", response_model=TravelPlanResponse)
+async def generate_travel_plan_public(request: TravelPlanRequest):
+    """
+    Generate a complete travel plan for the specified destination and dates.
+    
+    This is a public endpoint that does not require authentication.
+    Intended for casual website users who want to generate travel plans.
+    
+    For API integration and higher usage limits, please use the authenticated
+    /generate-travel-plan endpoint with an API key.
+    
+    This endpoint orchestrates multiple AI agents to:
+    - Find points of interest
+    - Locate hotels
+    - Generate a day-by-day itinerary
+    - Create route maps
+    - Provide comprehensive travel recommendations
+    """
+    try:
+        # Get orchestrator
+        orch = get_orchestrator()
+        
+        # Calculate duration in days
+        from datetime import datetime
+        start = datetime.strptime(request.start_date, "%Y-%m-%d")
+        end = datetime.strptime(request.end_date, "%Y-%m-%d")
+        duration = (end - start).days
+        
+        if duration <= 0:
+            raise HTTPException(status_code=400, detail="End date must be after start date")
+        
+        # Prepare interests string
+        interests = "general tourism"
+        if request.interests:
+            interests = ", ".join(request.interests)
+        
+        # Run the orchestrator
+        result = await orch.plan_trip_async(
+            location=request.destination,
+            interests=interests,
+            duration=duration
+        )
+        
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=500,
+                detail=f"Travel planning failed: {result.get('error', 'Unknown error')}"
+            )
+        
+        # Extract state from result
+        state = result.get("state", {})
+        
+        # Try to save output files
+        try:
+            file_paths = orch.save_output_files(state)
+        except Exception as e:
+            print(f"Warning: Could not save files: {e}")
+            file_paths = {}
+        
+        # Format response
+        response = format_travel_plan_response(
+            destination=request.destination,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            output_data=state,
+            file_paths=file_paths
+        )
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error generating travel plan: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate travel plan: {str(e)}"
+        )
+
+
 @app.get("/download/{file_type}")
 async def download_file(
     file_type: str,

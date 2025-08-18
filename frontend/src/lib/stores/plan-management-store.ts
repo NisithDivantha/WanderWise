@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { TravelPlan } from '@/types/api'
 
-export interface SavedTravelPlan extends TravelPlan {
+export interface SavedTravelPlan extends Omit<TravelPlan, 'plan_id'> {
   id: string
   name: string
   saved_at: string
@@ -11,6 +11,7 @@ export interface SavedTravelPlan extends TravelPlan {
   notes?: string
   last_viewed?: string
   view_count: number
+  duration_days: number // Make this required for saved plans
 }
 
 export interface PlanFolder {
@@ -110,6 +111,12 @@ export const usePlanManagementStore = create<PlanManagementState>()(
       // Plan Management Actions
       savePlan: (plan, name) => {
         const id = `plan-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        
+        // Calculate duration if not provided
+        const duration = plan.duration_days || Math.ceil(
+          (new Date(plan.end_date).getTime() - new Date(plan.start_date).getTime()) / (1000 * 60 * 60 * 24)
+        )
+        
         const savedPlan: SavedTravelPlan = {
           ...plan,
           id,
@@ -117,7 +124,8 @@ export const usePlanManagementStore = create<PlanManagementState>()(
           saved_at: new Date().toISOString(),
           is_favorite: false,
           tags: [],
-          view_count: 0
+          view_count: 0,
+          duration_days: duration
         }
 
         set((state) => ({
@@ -156,7 +164,8 @@ export const usePlanManagementStore = create<PlanManagementState>()(
           id: newId,
           name: `${originalPlan.name} (Copy)`,
           saved_at: new Date().toISOString(),
-          view_count: 0
+          view_count: 0,
+          duration_days: originalPlan.duration_days
         }
 
         set((state) => ({
@@ -403,7 +412,7 @@ export const usePlanManagementStore = create<PlanManagementState>()(
               compareValue = a.destination.localeCompare(b.destination)
               break
             case 'duration':
-              compareValue = a.duration_days - b.duration_days
+              compareValue = (a.duration_days || 0) - (b.duration_days || 0)
               break
             case 'last_viewed':
               const aViewed = a.last_viewed ? new Date(a.last_viewed).getTime() : 0

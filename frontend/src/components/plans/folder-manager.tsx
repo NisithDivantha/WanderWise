@@ -73,7 +73,7 @@ export function FolderManager({ onFolderSelect, selectedFolderId }: FolderManage
 
   const handleDeleteFolder = (folderId: string) => {
     const folder = folders.find(f => f.id === folderId)
-    if (folder && window.confirm(`Are you sure you want to delete the folder "${folder.name}"? Plans inside will not be deleted.`)) {
+    if (folder && window.confirm(`Are you sure you want to delete the folder &ldquo;${folder.name}&rdquo;? Plans inside will not be deleted.`)) {
       deleteFolder(folderId)
       addNotification({
         type: 'success',

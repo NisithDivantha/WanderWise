@@ -74,7 +74,7 @@ export function TravelPlanResults({
               </div>
               <div className="flex items-center gap-1">
                 <DollarSign className="w-4 h-4" />
-                <span>{plan.summary.estimated_budget}</span>
+                <span>{plan.summary?.estimated_budget || 'Budget varies'}</span>
               </div>
             </div>
           </div>
@@ -160,19 +160,25 @@ function OverviewTab({ plan }: { plan: TravelPlan }) {
             Trip Highlights
           </CardTitle>
           <CardDescription>
-            {plan.summary.theme}
+            {plan.summary?.theme || plan.executive_summary}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {plan.summary.highlights.map((highlight, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                  {index + 1}
-                </span>
-                <p className="text-gray-700">{highlight}</p>
+            {plan.summary?.highlights?.length ? (
+              plan.summary.highlights.map((highlight: string, index: number) => (
+                <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                  <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                    {index + 1}
+                  </span>
+                  <p className="text-gray-700">{highlight}</p>
+                </div>
+              ))
+            ) : (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-gray-700">{plan.executive_summary}</p>
               </div>
-            ))}
+            )}
           </div>
         </CardContent>
       </Card>
@@ -198,7 +204,7 @@ function OverviewTab({ plan }: { plan: TravelPlan }) {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Budget:</span>
-              <span className="font-medium">{plan.summary.estimated_budget}</span>
+              <span className="font-medium">{plan.summary?.estimated_budget || 'Budget varies'}</span>
             </div>
           </CardContent>
         </Card>
@@ -209,12 +215,18 @@ function OverviewTab({ plan }: { plan: TravelPlan }) {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {plan.summary.travel_tips.slice(0, 3).map((tip, index) => (
-                <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
-                  <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0 mt-2"></span>
-                  {tip}
+              {plan.summary?.travel_tips?.length ? (
+                plan.summary.travel_tips.slice(0, 3).map((tip: string, index: number) => (
+                  <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0 mt-2"></span>
+                    {tip}
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-gray-600">
+                  General travel tips will be included in your detailed itinerary.
                 </li>
-              ))}
+              )}
             </ul>
           </CardContent>
         </Card>
@@ -228,13 +240,13 @@ function ItineraryTab({ plan }: { plan: TravelPlan }) {
   return (
     <div className="space-y-6">
       {plan.itinerary.map((day, index) => (
-        <Card key={day.day}>
+        <Card key={day.day || day.date}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <span className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                {day.day}
+                {day.day || new Date(day.date).getDate()}
               </span>
-              Day {day.day} - {new Date(day.date).toLocaleDateString()}
+              Day {day.day || new Date(day.date).getDate()} - {new Date(day.date).toLocaleDateString()}
             </CardTitle>
             {day.theme && (
               <CardDescription>
@@ -255,7 +267,7 @@ function ItineraryTab({ plan }: { plan: TravelPlan }) {
                     <h4 className="font-medium text-gray-900">{activity.activity}</h4>
                     <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
                       <MapPin className="w-3 h-3" />
-                      {activity.location}
+                      {activity.location || ''}
                     </p>
                     {activity.duration && (
                       <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
@@ -301,7 +313,7 @@ function PlacesTab({ plan }: { plan: TravelPlan }) {
             </CardTitle>
             <CardDescription>
               <Badge variant="secondary" className="text-xs">
-                {poi.category}
+                {poi.category || 'Attraction'}
               </Badge>
             </CardDescription>
           </CardHeader>
@@ -317,7 +329,7 @@ function PlacesTab({ plan }: { plan: TravelPlan }) {
             <div className="space-y-2 text-xs text-gray-500">
               <div className="flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
-                <span>{poi.address}</span>
+                <span>{poi.address || 'Address not available'}</span>
               </div>
               {poi.opening_hours && (
                 <div className="flex items-center gap-1">
@@ -328,7 +340,7 @@ function PlacesTab({ plan }: { plan: TravelPlan }) {
               {poi.price_level && (
                 <div className="flex items-center gap-1">
                   <DollarSign className="w-3 h-3" />
-                  <span>{'$'.repeat(poi.price_level)} Price Level</span>
+                  <span>{'$'.repeat(poi.price_level || 1)} Price Level</span>
                 </div>
               )}
             </div>
@@ -353,33 +365,35 @@ function HotelsTab({ plan }: { plan: TravelPlan }) {
                   <Star className="w-4 h-4 fill-current" />
                   <span className="text-sm font-medium text-gray-600">{hotel.rating}</span>
                 </div>
-                <Badge variant="outline">{hotel.price_range}</Badge>
+                <Badge variant="outline">{hotel.price_range || hotel.price || 'Price varies'}</Badge>
               </div>
             </CardTitle>
             <CardDescription className="flex items-center gap-1">
               <MapPin className="w-4 h-4" />
-              {hotel.address}
+              {hotel.address || 'Address not available'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-gray-600 mb-4">{hotel.description}</p>
             
             {/* Amenities */}
-            <div className="mb-4">
-              <h4 className="font-medium text-gray-900 mb-2">Amenities</h4>
-              <div className="flex flex-wrap gap-1">
-                {hotel.amenities.slice(0, 6).map((amenity, idx) => (
-                  <Badge key={idx} variant="secondary" className="text-xs">
-                    {amenity}
-                  </Badge>
-                ))}
-                {hotel.amenities.length > 6 && (
-                  <Badge variant="outline" className="text-xs">
-                    +{hotel.amenities.length - 6} more
-                  </Badge>
-                )}
+            {hotel.amenities && hotel.amenities.length > 0 && (
+              <div className="mb-4">
+                <h4 className="font-medium text-gray-900 mb-2">Amenities</h4>
+                <div className="flex flex-wrap gap-1">
+                  {hotel.amenities.slice(0, 6).map((amenity: string, idx: number) => (
+                    <Badge key={idx} variant="secondary" className="text-xs">
+                      {amenity}
+                    </Badge>
+                  ))}
+                  {hotel.amenities.length > 6 && (
+                    <Badge variant="outline" className="text-xs">
+                      +{hotel.amenities.length - 6} more
+                    </Badge>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Booking Link */}
             {hotel.booking_url && (
@@ -387,7 +401,7 @@ function HotelsTab({ plan }: { plan: TravelPlan }) {
                 variant="outline" 
                 size="sm" 
                 className="flex items-center gap-2"
-                onClick={() => window.open(hotel.booking_url, '_blank')}
+                onClick={() => hotel.booking_url && window.open(hotel.booking_url, '_blank')}
               >
                 <ExternalLink className="w-4 h-4" />
                 View Details & Book

@@ -129,26 +129,30 @@ class APIClient {
    * Generate travel plan
    */
   async generateTravelPlan(request: TravelPlanRequest): Promise<TravelPlan> {
-    const response = await this.client.post<APIResponse<TravelPlan>>('/generate-travel-plan', request)
+    const response = await this.client.post('/generate-travel-plan', request)
     
-    if (!response.data.success) {
-      throw new Error(response.data.error || 'Failed to generate travel plan')
-    }
+    // Your backend returns the plan directly, not wrapped in APIResponse
+    return response.data
+  }
+
+  /**
+   * Generate travel plan without authentication (public endpoint)
+   */
+  async generateTravelPlanPublic(request: TravelPlanRequest): Promise<TravelPlan> {
+    const response = await this.client.post('/public/generate-travel-plan', request)
     
-    return response.data.data
+    // Your backend returns the plan directly, not wrapped in APIResponse
+    return response.data
   }
 
   /**
    * Get available destinations
    */
   async getDestinations(): Promise<string[]> {
-    const response = await this.client.get<APIResponse<string[]>>('/destinations')
+    const response = await this.client.get('/destinations')
     
-    if (!response.data.success) {
-      throw new Error(response.data.error || 'Failed to fetch destinations')
-    }
-    
-    return response.data.data
+    // Your backend returns { destinations: [...] }
+    return response.data.destinations || []
   }
 
   /**

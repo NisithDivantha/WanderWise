@@ -11,6 +11,7 @@ import {
 // API configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
 const API_TIMEOUT = parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || '30000')
+const TRAVEL_PLAN_TIMEOUT = parseInt(process.env.NEXT_PUBLIC_TRAVEL_PLAN_TIMEOUT || '300000') // 5 minutes for travel plan generation
 
 class APIClient {
   private client: AxiosInstance
@@ -54,9 +55,15 @@ class APIClient {
         return response
       },
       (error: AxiosError) => {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.error(`❌ API Error: ${error.response?.status} ${error.config?.url}`, error.response?.data)
-        }
+        // Always log errors for debugging
+        console.error(`❌ API Error: ${error.response?.status} ${error.config?.url}`, error.response?.data)
+        console.error('Full error details:', {
+          message: error.message,
+          code: error.code,
+          response: error.response?.data,
+          status: error.response?.status,
+          headers: error.response?.headers
+        })
         
         // Handle common errors
         if (error.response?.status === 429) {
@@ -129,7 +136,14 @@ class APIClient {
    * Generate travel plan
    */
   async generateTravelPlan(request: TravelPlanRequest): Promise<TravelPlan> {
-    const response = await this.client.post('/generate-travel-plan', request)
+    const response = await this.client.post('/generate-travel-plan', request, {
+      timeout: TRAVEL_PLAN_TIMEOUT // Use extended timeout for travel plan generation
+    })
+    
+    // Debug: Log the response structure
+    console.log('🎯 API Response received:', response.status, response.statusText)
+    console.log('📦 Response data structure:', Object.keys(response.data))
+    console.log('📝 Full response data:', response.data)
     
     // Your backend returns the plan directly, not wrapped in APIResponse
     return response.data
@@ -139,7 +153,14 @@ class APIClient {
    * Generate travel plan without authentication (public endpoint)
    */
   async generateTravelPlanPublic(request: TravelPlanRequest): Promise<TravelPlan> {
-    const response = await this.client.post('/public/generate-travel-plan', request)
+    const response = await this.client.post('/public/generate-travel-plan', request, {
+      timeout: TRAVEL_PLAN_TIMEOUT // Use extended timeout for travel plan generation
+    })
+    
+    // Debug: Log the response structure
+    console.log('🎯 API Response received:', response.status, response.statusText)
+    console.log('📦 Response data structure:', Object.keys(response.data))
+    console.log('📝 Full response data:', response.data)
     
     // Your backend returns the plan directly, not wrapped in APIResponse
     return response.data

@@ -4,6 +4,7 @@ import { TravelPlan } from '@/types/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from './badge'
+import { TravelMap } from './travel-map'
 import { 
   MapPin, 
   Calendar, 
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
+import './travel-map.css'
 
 interface TravelPlanResultsProps {
   plan: TravelPlan
@@ -35,7 +37,7 @@ export function TravelPlanResults({
   onDownload, 
   className 
 }: TravelPlanResultsProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'itinerary' | 'places' | 'hotels'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'itinerary' | 'places' | 'hotels' | 'map'>('overview')
   const [savedPlans, setSavedPlans] = useState<Set<string>>(new Set())
 
   const handleSave = () => {
@@ -51,7 +53,8 @@ export function TravelPlanResults({
     { id: 'overview', label: 'Overview', icon: MapPin },
     { id: 'itinerary', label: 'Itinerary', icon: Calendar },
     { id: 'places', label: 'Places', icon: Camera },
-    { id: 'hotels', label: 'Hotels', icon: Hotel }
+    { id: 'hotels', label: 'Hotels', icon: Hotel },
+    { id: 'map', label: 'Map', icon: MapPin }
   ] as const
 
   return (
@@ -143,97 +146,76 @@ export function TravelPlanResults({
         {activeTab === 'itinerary' && <ItineraryTab plan={plan} />}
         {activeTab === 'places' && <PlacesTab plan={plan} />}
         {activeTab === 'hotels' && <HotelsTab plan={plan} />}
+        {activeTab === 'map' && <MapTab plan={plan} />}
       </div>
     </div>
   )
 }
 
-// Overview Tab Component
-function OverviewTab({ plan }: { plan: TravelPlan }) {
+// Tab Components
+interface TabProps {
+  plan: TravelPlan;
+}
+
+const MapTab: React.FC<TabProps> = ({ plan }) => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Trip Summary */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="w-5 h-5" />
-            Trip Highlights
-          </CardTitle>
-          <CardDescription>
-            {plan.summary?.theme || plan.executive_summary}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {plan.summary?.highlights?.length ? (
-              plan.summary.highlights.map((highlight: string, index: number) => (
-                <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                  <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                    {index + 1}
-                  </span>
-                  <p className="text-gray-700">{highlight}</p>
-                </div>
-              ))
-            ) : (
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-gray-700">{plan.executive_summary}</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <MapPin className="w-5 h-5 text-blue-600" />
+        <h3 className="text-xl font-semibold">Interactive Map</h3>
+      </div>
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <TravelMap plan={plan} />
+      </div>
+    </div>
+  );
+};
 
-      {/* Quick Stats */}
-      <div className="space-y-4">
+const OverviewTab: React.FC<TabProps> = ({ plan }) => {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Quick Stats</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Duration:</span>
-              <span className="font-medium">{plan.duration_days} days</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Places to visit:</span>
-              <span className="font-medium">{plan.points_of_interest.length}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Hotel options:</span>
-              <span className="font-medium">{plan.hotels.length}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Budget:</span>
-              <span className="font-medium">{plan.summary?.estimated_budget || 'Budget varies'}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Travel Tips</CardTitle>
+            <CardTitle>Trip Overview</CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2">
-              {plan.summary?.travel_tips?.length ? (
-                plan.summary.travel_tips.slice(0, 3).map((tip: string, index: number) => (
-                  <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0 mt-2"></span>
-                    {tip}
-                  </li>
-                ))
-              ) : (
-                <li className="text-sm text-gray-600">
-                  General travel tips will be included in your detailed itinerary.
-                </li>
-              )}
-            </ul>
+            <div className="space-y-2">
+              <p><strong>Destination:</strong> {plan.destination}</p>
+              <p><strong>Start Date:</strong> {new Date(plan.start_date).toLocaleDateString()}</p>
+              <p><strong>End Date:</strong> {new Date(plan.end_date).toLocaleDateString()}</p>
+              <p><strong>Duration:</strong> {plan.duration_days || Math.ceil((new Date(plan.end_date).getTime() - new Date(plan.start_date).getTime()) / (1000 * 60 * 60 * 24))} days</p>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Stats</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <p><strong>Total Activities:</strong> {plan.itinerary.reduce((acc, day) => acc + day.activities.length, 0)}</p>
+              <p><strong>Places to Visit:</strong> {plan.points_of_interest?.length || 0}</p>
+              <p><strong>Hotels:</strong> {plan.hotels?.length || 0}</p>
+            </div>
           </CardContent>
         </Card>
       </div>
+      
+      {plan.executive_summary && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Executive Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600">{plan.executive_summary}</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
-  )
-}
+  );
+};
 
 // Itinerary Tab Component  
 function ItineraryTab({ plan }: { plan: TravelPlan }) {

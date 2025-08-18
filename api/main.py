@@ -88,22 +88,61 @@ def format_travel_plan_response(
     pois = []
     if 'pois' in output_data:
         for poi in output_data['pois']:
+            # Handle coordinates - convert lat/lon to coordinates format
+            coordinates = None
+            if 'lat' in poi and 'lon' in poi:
+                coordinates = {
+                    'lat': float(poi['lat']),
+                    'lng': float(poi['lon'])
+                }
+            elif 'coordinates' in poi:
+                coordinates = poi['coordinates']
+            
+            # Get description from various possible sources
+            description = (
+                poi.get('description') or 
+                poi.get('google_reviews', {}).get('name') or
+                poi.get('wikipedia_summary', '') or
+                'No description available'
+            )
+            
+            # Get rating from Google reviews if available
+            rating = 0
+            if 'google_reviews' in poi and poi['google_reviews'].get('rating'):
+                rating = float(poi['google_reviews']['rating'])
+            else:
+                rating = float(poi.get('rating', 0))
+            
             pois.append(PointOfInterest(
                 name=poi.get('name', ''),
-                rating=float(poi.get('rating', 0)),
-                description=poi.get('description', 'No description'),
-                coordinates=poi.get('coordinates')
+                rating=rating,
+                description=description,
+                coordinates=coordinates
             ))
     
     # Extract hotels
     hotels = []
     if 'hotels' in output_data:
         for hotel in output_data['hotels']:
+            # Get description from various possible sources
+            description = (
+                hotel.get('description') or 
+                hotel.get('google_reviews', {}).get('name') or
+                'No description available'
+            )
+            
+            # Get rating from Google reviews if available
+            rating = None
+            if 'google_reviews' in hotel and hotel['google_reviews'].get('rating'):
+                rating = float(hotel['google_reviews']['rating'])
+            elif hotel.get('rating'):
+                rating = float(hotel.get('rating', 0))
+            
             hotels.append(Hotel(
                 name=hotel.get('name', ''),
                 price=hotel.get('price', 'N/A'),
-                rating=float(hotel.get('rating', 0)) if hotel.get('rating') else None,
-                description=hotel.get('description')
+                rating=rating,
+                description=description
             ))
     
     # Extract itinerary - handle the LLM-generated format
@@ -117,10 +156,19 @@ def format_travel_plan_response(
                 day_activities = []
                 for activity in activities:
                     if isinstance(activity, dict):
+                        # Create comprehensive description from available fields
+                        description_parts = []
+                        if activity.get('description'):
+                            description_parts.append(activity['description'])
+                        if activity.get('tips'):
+                            description_parts.append(f"💡 Tip: {activity['tips']}")
+                        
+                        full_description = ' | '.join(description_parts) if description_parts else ''
+                        
                         day_activities.append(ItineraryActivity(
                             time=activity.get('time', ''),
                             activity=activity.get('activity', activity.get('name', 'Unknown')),
-                            description=activity.get('description', '')
+                            description=full_description
                         ))
                     else:
                         # Handle string activities
@@ -226,8 +274,12 @@ async def generate_travel_plan(
                 detail=f"Travel planning failed: {result.get('error', 'Unknown error')}"
             )
         
-        # Extract state from result
+        # Extract state from result - handle nested structure
         state = result.get("state", {})
+        result_data = result.get("result", {})
+        
+        # Use result_data if state is empty, otherwise use state
+        output_data = result_data if result_data and not state else state
         
         # Save results to files using the CLI save method
         try:
@@ -256,7 +308,7 @@ async def generate_travel_plan(
             destination=request.destination,
             start_date=request.start_date,
             end_date=request.end_date,
-            output_data=state,
+            output_data=output_data,
             file_paths=file_paths
         )
         
@@ -322,12 +374,16 @@ async def generate_travel_plan_public(request: TravelPlanRequest):
                 detail=f"Travel planning failed: {result.get('error', 'Unknown error')}"
             )
         
-        # Extract state from result
+        # Extract state from result - handle nested structure
         state = result.get("state", {})
+        result_data = result.get("result", {})
+        
+        # Use result_data if state is empty, otherwise use state
+        output_data = result_data if result_data and not state else state
         
         # Try to save output files
         try:
-            file_paths = orch.save_output_files(state)
+            file_paths = orch.save_output_files(output_data)
         except Exception as e:
             print(f"Warning: Could not save files: {e}")
             file_paths = {}
@@ -337,7 +393,7 @@ async def generate_travel_plan_public(request: TravelPlanRequest):
             destination=request.destination,
             start_date=request.start_date,
             end_date=request.end_date,
-            output_data=state,
+            output_data=output_data,
             file_paths=file_paths
         )
         

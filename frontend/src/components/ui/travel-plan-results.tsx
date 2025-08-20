@@ -184,7 +184,7 @@ const OverviewTab: React.FC<TabProps> = ({ plan }) => {
               <p><strong>Destination:</strong> {plan.destination}</p>
               <p><strong>Start Date:</strong> {new Date(plan.start_date).toLocaleDateString()}</p>
               <p><strong>End Date:</strong> {new Date(plan.end_date).toLocaleDateString()}</p>
-              <p><strong>Duration:</strong> {plan.duration_days || Math.ceil((new Date(plan.end_date).getTime() - new Date(plan.start_date).getTime()) / (1000 * 60 * 60 * 24))} days</p>
+              <p><strong>Duration:</strong> {plan.duration_days || Math.max(1, Math.ceil((new Date(plan.end_date).getTime() - new Date(plan.start_date).getTime()) / (1000 * 60 * 60 * 24)))} days</p>
             </div>
           </CardContent>
         </Card>
@@ -195,7 +195,7 @@ const OverviewTab: React.FC<TabProps> = ({ plan }) => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <p><strong>Total Activities:</strong> {plan.itinerary.reduce((acc, day) => acc + day.activities.length, 0)}</p>
+              <p><strong>Total Activities:</strong> {plan.itinerary.reduce((acc, day) => acc + (day.activities?.length || 0), 0)}</p>
               <p><strong>Places to Visit:</strong> {plan.points_of_interest?.length || 0}</p>
               <p><strong>Hotels:</strong> {plan.hotels?.length || 0}</p>
             </div>
@@ -219,64 +219,92 @@ const OverviewTab: React.FC<TabProps> = ({ plan }) => {
 
 // Itinerary Tab Component  
 function ItineraryTab({ plan }: { plan: TravelPlan }) {
+  // Helper function to extract day number and create proper date
+  const getDayInfo = (dayObj: any, index: number) => {
+    let dayNumber = index + 1;
+    let actualDate = new Date(plan.start_date);
+    
+    // Try to extract day number from date string like "Day 1 - [Arrival Date]"
+    if (dayObj.date && typeof dayObj.date === 'string') {
+      const dayMatch = dayObj.date.match(/Day (\d+)/i);
+      if (dayMatch) {
+        dayNumber = parseInt(dayMatch[1]);
+      }
+    }
+    
+    // If day number is provided directly, use it
+    if (dayObj.day && typeof dayObj.day === 'number') {
+      dayNumber = dayObj.day;
+    }
+    
+    // Calculate actual date by adding days to start date
+    actualDate.setDate(actualDate.getDate() + (dayNumber - 1));
+    
+    return { dayNumber, actualDate };
+  };
+
   return (
     <div className="space-y-6">
-      {plan.itinerary.map((day, index) => (
-        <Card key={day.day || day.date}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                {day.day || new Date(day.date).getDate()}
-              </span>
-              Day {day.day || new Date(day.date).getDate()} - {new Date(day.date).toLocaleDateString()}
-            </CardTitle>
-            {day.theme && (
-              <CardDescription>
-                Theme: {day.theme}
-              </CardDescription>
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {day.activities.map((activity, actIndex) => (
-                <div key={actIndex} className="flex items-start gap-4 p-3 border-l-2 border-blue-200 bg-gray-50 rounded-r-lg">
-                  <div className="flex-shrink-0">
-                    <Badge variant="outline" className="text-xs">
-                      {activity.time}
-                    </Badge>
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">{activity.activity}</h4>
-                    <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
-                      <MapPin className="w-3 h-3" />
-                      {activity.location || ''}
-                    </p>
-                    {activity.duration && (
-                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                        <Clock className="w-3 h-3" />
-                        {activity.duration}
+      {plan.itinerary.map((day, index) => {
+        const { dayNumber, actualDate } = getDayInfo(day, index);
+        
+        return (
+          <Card key={day.day || day.date || index}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                  {dayNumber}
+                </span>
+                Day {dayNumber} - {actualDate.toLocaleDateString()}
+              </CardTitle>
+              {day.theme && (
+                <CardDescription>
+                  Theme: {day.theme}
+                </CardDescription>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {day.activities.map((activity, actIndex) => (
+                  <div key={actIndex} className="flex items-start gap-4 p-3 border-l-2 border-blue-200 bg-gray-50 rounded-r-lg">
+                    <div className="flex-shrink-0">
+                      <Badge variant="outline" className="text-xs">
+                        {activity.time}
+                      </Badge>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">{activity.activity}</h4>
+                      <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                        <MapPin className="w-3 h-3" />
+                        {activity.location || ''}
                       </p>
-                    )}
-                    {activity.notes && (
-                      <p className="text-sm text-gray-600 mt-1">{activity.notes}</p>
-                    )}
+                      {activity.duration && (
+                        <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                          <Clock className="w-3 h-3" />
+                          {activity.duration}
+                        </p>
+                      )}
+                      {activity.notes && (
+                        <p className="text-sm text-gray-600 mt-1">{activity.notes}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-            {day.estimated_budget && (
-              <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                <p className="text-sm text-green-700">
-                  <DollarSign className="w-4 h-4 inline mr-1" />
-                  Estimated budget for today: {day.estimated_budget}
-                </p>
+                ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+              {day.estimated_budget && (
+                <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-sm text-green-700">
+                    <DollarSign className="w-4 h-4 inline mr-1" />
+                    Estimated budget for today: {day.estimated_budget}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
-  )
+  );
 }
 
 // Places Tab Component

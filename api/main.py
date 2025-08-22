@@ -261,11 +261,19 @@ async def generate_travel_plan(
         if request.interests:
             interests = ", ".join(request.interests)
         
-        # Run the orchestrator
+        # Run the orchestrator with all frontend parameters
         result = await orch.plan_trip_async(
             location=request.destination,
             interests=interests,
-            duration=duration
+            duration=duration,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            budget=request.budget,
+            group_size=getattr(request, 'group_size', None),
+            travel_style=getattr(request, 'travel_style', None),
+            accommodation=getattr(request, 'accommodation', None),
+            transportation=getattr(request, 'transportation', None),
+            special_requirements=getattr(request, 'special_requirements', None)
         )
         
         if not result.get("success"):
@@ -361,11 +369,19 @@ async def generate_travel_plan_public(request: TravelPlanRequest):
         if request.interests:
             interests = ", ".join(request.interests)
         
-        # Run the orchestrator
+        # Run the orchestrator with full parameters
         result = await orch.plan_trip_async(
             location=request.destination,
             interests=interests,
-            duration=duration
+            duration=duration,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            budget=request.budget,
+            group_size=getattr(request, 'group_size', None),
+            travel_style=getattr(request, 'travel_style', None),
+            accommodation=getattr(request, 'accommodation', None),
+            transportation=getattr(request, 'transportation', None),
+            special_requirements=getattr(request, 'special_requirements', None)
         )
         
         if not result.get("success"):

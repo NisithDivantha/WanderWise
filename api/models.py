@@ -10,10 +10,15 @@ from datetime import datetime
 class TravelPlanRequest(BaseModel):
     """Request model for travel plan generation."""
     destination: str = Field(..., description="Destination city and country (e.g., 'Paris, France')")
-    start_date: str = Field(..., description="Start date in YYYY-MM-DD format")
+    start_date: str = Field(..., description="Start date in YYYY-MM-DD format") 
     end_date: str = Field(..., description="End date in YYYY-MM-DD format")
-    budget: Optional[str] = Field(None, description="Budget range (e.g., 'low', 'medium', 'high')")
+    budget: Optional[str] = Field(None, description="Budget range: 'budget', 'mid-range', or 'luxury'")
     interests: Optional[List[str]] = Field(None, description="List of interests (e.g., ['culture', 'food', 'history'])")
+    travel_style: Optional[str] = Field(None, description="Travel style: 'relaxed', 'moderate', or 'packed'")
+    accommodation: Optional[str] = Field(None, description="Accommodation preference: 'hotel', 'hostel', 'airbnb', or 'mixed'")
+    transportation: Optional[List[str]] = Field(None, description="Transportation modes: ['walking', 'public', 'taxi', 'rental']")
+    special_requirements: Optional[str] = Field(None, description="Any special requirements or requests")
+    group_size: Optional[int] = Field(None, description="Number of people in the travel group")
     use_llm: bool = Field(True, description="Whether to use LLM for smart itinerary generation")
 
 

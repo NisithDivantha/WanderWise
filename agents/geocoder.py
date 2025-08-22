@@ -48,26 +48,23 @@ def google_maps_geocode(location: str) -> dict:
     api_key = os.getenv("GOOGLE_MAPS_API_KEY")
     
     if not api_key:
-        print("   ⚠️ No Google Maps API key found")
         raise ValueError("Google Maps API key not found in environment variables.")
-    
-    print(f"   🔑 Using API key: {api_key[:10]}...")  # Show first 10 chars
     
     url = "https://maps.googleapis.com/maps/api/geocode/json"
     params = {"address": location, "key": api_key}
     
     try:
         response = requests.get(url, params=params, timeout=10)
-        print(f"   📡 HTTP Status: {response.status_code}")
+        print(f"HTTP Status: {response.status_code}")
         
         data = response.json()
-        print(f"   📄 Response status: {data.get('status')}")
+        print(f"Response status: {data.get('status')}")
         
         if data.get("status") == "REQUEST_DENIED":
-            print(f"   ❌ Request denied: {data.get('error_message', 'Unknown error')}")
+            print(f"Request denied: {data.get('error_message', 'Unknown error')}")
             
         if data.get("status") == "OVER_QUERY_LIMIT":
-            print(f"   ❌ Quota exceeded")
+            print(f"Quota exceeded")
             
         if data.get("status") == "OK" and data.get("results"):
             result = data["results"][0]
@@ -80,9 +77,10 @@ def google_maps_geocode(location: str) -> dict:
             }
         
     except Exception as e:
-        print(f"   ❌ Request failed: {e}")
+        print(f"Request failed: {e}")
         
     return None
+
 def clean_location_string(location: str) -> str:
     """Clean and standardize location string"""
     # Remove extra whitespace

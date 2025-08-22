@@ -117,6 +117,9 @@ class HotelFetchingInput(BaseModel):
     latitude: float = Field(description="Latitude coordinate")
     longitude: float = Field(description="Longitude coordinate")
     location_name: str = Field(description="Name of the location")
+    budget: Optional[str] = Field(None, description="Budget range (low, medium, high)")
+    group_size: Optional[int] = Field(None, description="Number of people in the group")
+    accommodation: Optional[str] = Field(None, description="Accommodation preference (hotel, hostel, airbnb, mixed)")
 
 
 class HotelFetchingTool(BaseTool):
@@ -131,11 +134,20 @@ class HotelFetchingTool(BaseTool):
         latitude: float, 
         longitude: float, 
         location_name: str,
+        budget: Optional[str] = None,
+        group_size: Optional[int] = None,
         run_manager: Optional[CallbackManagerForToolRun] = None
     ) -> List[Dict[str, Any]]:
         """Execute the hotel fetching tool."""
         try:
-            hotels = suggest_hotels(location_name, latitude, longitude)
+            # Pass additional parameters to the hotel agent
+            hotels = suggest_hotels(
+                location_name, 
+                latitude, 
+                longitude,
+                budget=budget,
+                group_size=group_size
+            )
             if run_manager:
                 run_manager.on_text(f"Found {len(hotels)} hotels near {location_name}", verbose=True)
             return hotels
@@ -249,6 +261,14 @@ class ItineraryGenerationInput(BaseModel):
     hotels: List[Dict[str, Any]] = Field(description="List of hotels")
     route: Dict[str, Any] = Field(description="Calculated route information")
     duration: int = Field(description="Trip duration in days")
+    budget: Optional[str] = Field(None, description="Budget range (low, medium, high)")
+    group_size: Optional[int] = Field(None, description="Number of people in the group")
+    start_date: Optional[str] = Field(None, description="Trip start date")
+    end_date: Optional[str] = Field(None, description="Trip end date")
+    travel_style: Optional[str] = Field(None, description="Travel style (relaxed, moderate, packed)")
+    accommodation: Optional[str] = Field(None, description="Accommodation preference")
+    transportation: Optional[List[str]] = Field(None, description="Preferred transportation modes")
+    special_requirements: Optional[str] = Field(None, description="Special requirements")
 
 
 class ItineraryGenerationTool(BaseTool):
@@ -264,6 +284,14 @@ class ItineraryGenerationTool(BaseTool):
         hotels: List[Dict[str, Any]], 
         route: Dict[str, Any], 
         duration: int,
+        budget: Optional[str] = None,
+        group_size: Optional[int] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        travel_style: Optional[str] = None,
+        accommodation: Optional[str] = None,
+        transportation: Optional[List[str]] = None,
+        special_requirements: Optional[str] = None,
         run_manager: Optional[CallbackManagerForToolRun] = None
     ) -> Dict[str, Any]:
         """Execute the itinerary generation tool."""
@@ -274,7 +302,14 @@ class ItineraryGenerationTool(BaseTool):
                 hotels=hotels, 
                 duration=duration,
                 interests="general tourism",  # This could be passed from user input
-                budget_range="moderate"
+                budget_range=budget or "moderate",
+                group_size=group_size or 2,
+                start_date=start_date,
+                end_date=end_date,
+                travel_style=travel_style,
+                accommodation=accommodation,
+                transportation=transportation,
+                special_requirements=special_requirements
             )
             
             if run_manager:
@@ -284,13 +319,12 @@ class ItineraryGenerationTool(BaseTool):
             # Fallback to basic itinerary
             try:
                 from datetime import datetime
-                start_date = datetime.now().strftime("%Y-%m-%d")
-                itinerary = generate_day_by_day_itinerary(pois, start_date)
+                fallback_start_date = start_date or datetime.now().strftime("%Y-%m-%d")
+                itinerary = generate_day_by_day_itinerary(pois, fallback_start_date)
                 return itinerary
             except Exception as fallback_error:
                 return {"error": f"Itinerary generation failed: {str(e)}, Fallback error: {str(fallback_error)}"}
-
-
+    
 class FinalSummaryInput(BaseModel):
     """Input for final summary generation tool."""
     itinerary: Dict[str, Any] = Field(description="Generated itinerary")

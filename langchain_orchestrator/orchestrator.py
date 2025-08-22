@@ -308,11 +308,22 @@ class TravelPlannerOrchestrator:
             print(f"⚠️ Missing latitude/longitude in coordinates: {coords}")
             return []
         
-        result = self.tools["hotel_fetching_tool"].run({
+        # Prepare hotel search parameters
+        hotel_params = {
             "latitude": lat,
             "longitude": lng,
             "location_name": inputs["location"]
-        })
+        }
+        
+        # Add budget if available
+        if inputs.get("budget"):
+            hotel_params["budget"] = inputs["budget"]
+            
+        # Add group size if available  
+        if inputs.get("group_size"):
+            hotel_params["group_size"] = inputs["group_size"]
+        
+        result = self.tools["hotel_fetching_tool"].run(hotel_params)
         
         message_bus.publish("hotels_fetched", {"count": len(result)}, "hotel_agent")
         return result
@@ -411,15 +422,31 @@ class TravelPlannerOrchestrator:
         route = data.get("route", {})
         
         # Get duration from memory or default to 3 days
-        duration = travel_memory.get_state("user_preferences").get("duration", 3)
+        user_prefs = travel_memory.get_state("user_preferences")
+        duration = user_prefs.get("duration", 3)
         
         if pois:
-            itinerary = self.tools["itinerary_generation_tool"].run({
+            itinerary_params = {
                 "pois": pois,
                 "hotels": hotels,
                 "route": route,
                 "duration": duration
-            })
+            }
+            
+            # Add additional parameters if available
+            if user_prefs.get("budget"):
+                itinerary_params["budget"] = user_prefs["budget"]
+                
+            if user_prefs.get("group_size"):
+                itinerary_params["group_size"] = user_prefs["group_size"]
+                
+            if user_prefs.get("start_date"):
+                itinerary_params["start_date"] = user_prefs["start_date"]
+                
+            if user_prefs.get("end_date"):
+                itinerary_params["end_date"] = user_prefs["end_date"]
+            
+            itinerary = self.tools["itinerary_generation_tool"].run(itinerary_params)
             travel_memory.update_state("itinerary", itinerary, "itinerary_agent")
             message_bus.publish("itinerary_generated", itinerary, "itinerary_agent")
             data["itinerary"] = itinerary
@@ -442,23 +469,60 @@ class TravelPlannerOrchestrator:
         
         return data
     
+    def _map_frontend_budget(self, budget: str) -> tuple[str, float]:
+        """Map frontend budget categories to backend values."""
+        if not budget:
+            return "medium", 100.0
+        
+        budget_mapping = {
+            "budget": ("low", 50.0),
+            "mid-range": ("medium", 100.0),
+            "luxury": ("high", 200.0)
+        }
+        
+        return budget_mapping.get(budget.lower(), ("medium", 100.0))
+
     async def plan_trip_async(self, location: str, interests: str = "general tourism", 
-                            duration: int = 3) -> Dict[str, Any]:
+                            duration: int = 3, start_date: str = None, end_date: str = None,
+                            budget: str = None, group_size: int = None,
+                            travel_style: str = None, accommodation: str = None,
+                            transportation: List[str] = None, special_requirements: str = None) -> Dict[str, Any]:
         """Plan a trip asynchronously."""
         # Reset state for new planning session
         reset_shared_state()
         
+        # Map frontend budget to backend format
+        budget_string, budget_numeric = self._map_frontend_budget(budget)
+        
         # Store user preferences
         travel_memory.update_state("user_preferences", {
             "interests": interests,
-            "duration": duration
+            "duration": duration,
+            "start_date": start_date,
+            "end_date": end_date,
+            "budget": budget_string,  # Use mapped string value
+            "budget_numeric": budget_numeric,  # Store numeric for agents that need it
+            "group_size": group_size,
+            "travel_style": travel_style,
+            "accommodation": accommodation,
+            "transportation": transportation,
+            "special_requirements": special_requirements
         }, "orchestrator")
         
         # Prepare inputs
         inputs = {
             "location": location,
             "interests": interests,
-            "duration": duration
+            "duration": duration,
+            "start_date": start_date,
+            "end_date": end_date,
+            "budget": budget_string,  # Use mapped budget string
+            "budget_numeric": budget_numeric,  # Include numeric budget
+            "group_size": group_size,
+            "travel_style": travel_style,
+            "accommodation": accommodation,
+            "transportation": transportation,
+            "special_requirements": special_requirements
         }
         
         try:
@@ -490,9 +554,11 @@ class TravelPlannerOrchestrator:
             }
     
     def plan_trip(self, location: str, interests: str = "general tourism", 
-                  duration: int = 3) -> Dict[str, Any]:
+                  duration: int = 3, start_date: str = None, end_date: str = None,
+                  budget: str = None, group_size: int = None) -> Dict[str, Any]:
         """Plan a trip synchronously."""
-        return asyncio.run(self.plan_trip_async(location, interests, duration))
+        return asyncio.run(self.plan_trip_async(location, interests, duration, 
+                                              start_date, end_date, budget, group_size))
     
     def get_real_time_status(self) -> Dict[str, Any]:
         """Get real-time status of the planning process."""

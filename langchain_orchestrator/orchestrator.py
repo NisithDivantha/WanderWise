@@ -214,8 +214,7 @@ class TravelPlannerOrchestrator:
         # Step 2: Parallel data fetching (POIs and Hotels)
         self.parallel_fetch_chain = RunnableParallel({
             "pois": RunnableLambda(self._fetch_pois),
-            "hotels": RunnableLambda(self._fetch_hotels),
-            "llm_pois": RunnableLambda(self._fetch_llm_pois)
+            "hotels": RunnableLambda(self._fetch_hotels)
         })
         
         # Step 3: POI enrichment chain (sequential processing)
@@ -258,8 +257,10 @@ class TravelPlannerOrchestrator:
         return {**inputs, "coordinates": result}
     
     def _fetch_pois(self, inputs: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Fetch POIs using the OpenTripMap API."""
+        """Fetch POIs using LLM first, then fall back to OpenTripMap API if LLM fails."""
         coords = inputs["coordinates"]
+        location = inputs["location"]
+        interests = inputs.get("interests", "general tourism")
         
         # Handle error cases
         if isinstance(coords, dict) and "error" in coords:
@@ -278,14 +279,56 @@ class TravelPlannerOrchestrator:
             print(f"⚠️ Missing latitude/longitude in coordinates: {coords}")
             return []
         
-        result = self.tools["poi_fetching_tool"].run({
-            "latitude": lat,
-            "longitude": lng,
-            "location_name": inputs["location"]
-        })
+        # Try LLM POI fetcher first
+        print(f"🤖 Attempting LLM-based POI discovery for {location}...")
+        try:
+            llm_result = self.tools["llm_poi_fetching_tool"].run({
+                "location": location,
+                "interests": interests
+            })
+            
+            # Check if LLM returned valid results
+            if llm_result and isinstance(llm_result, list) and len(llm_result) > 0:
+                # Check if result contains error
+                if not (len(llm_result) == 1 and isinstance(llm_result[0], dict) and "error" in llm_result[0]):
+                    print(f"✅ LLM POI discovery successful: {len(llm_result)} POIs found")
+                    message_bus.publish("pois_fetched", {"count": len(llm_result), "source": "llm"}, "poi_agent")
+                    return llm_result
+                else:
+                    print(f"❌ LLM POI discovery failed: {llm_result[0]['error']}")
+            else:
+                print("❌ LLM POI discovery returned no valid results")
+                
+        except Exception as e:
+            print(f"❌ LLM POI discovery failed with exception: {str(e)}")
         
-        message_bus.publish("pois_fetched", {"count": len(result)}, "poi_agent")
-        return result
+        # Fall back to OpenTripMap API
+        print(f"📡 Falling back to OpenTripMap API for {location}...")
+        try:
+            result = self.tools["poi_fetching_tool"].run({
+                "latitude": lat,
+                "longitude": lng,
+                "location_name": location
+            })
+            
+            if result and isinstance(result, list) and len(result) > 0:
+                # Check if result contains error
+                if not (len(result) == 1 and isinstance(result[0], dict) and "error" in result[0]):
+                    print(f"✅ OpenTripMap API successful: {len(result)} POIs found")
+                    message_bus.publish("pois_fetched", {"count": len(result), "source": "opentripmap"}, "poi_agent")
+                    return result
+                else:
+                    print(f"❌ OpenTripMap API failed: {result[0]['error']}")
+            else:
+                print("❌ OpenTripMap API returned no valid results")
+                
+        except Exception as e:
+            print(f"❌ OpenTripMap API failed with exception: {str(e)}")
+        
+        # If both methods fail, return empty list
+        print("❌ Both LLM and OpenTripMap POI fetching failed")
+        message_bus.publish("pois_fetched", {"count": 0, "source": "failed"}, "poi_agent")
+        return []
     
     def _fetch_hotels(self, inputs: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Fetch hotels."""
@@ -328,34 +371,12 @@ class TravelPlannerOrchestrator:
         message_bus.publish("hotels_fetched", {"count": len(result)}, "hotel_agent")
         return result
     
-    def _fetch_llm_pois(self, inputs: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Fetch POIs using LLM recommendations."""
-        if not self.llm:
-            return []
-        
-        interests = inputs.get("interests", "general tourism")
-        
-        result = self.tools["llm_poi_fetching_tool"].run({
-            "location": inputs["location"],
-            "interests": interests
-        })
-        
-        message_bus.publish("llm_pois_fetched", {"count": len(result)}, "llm_poi_agent")
-        return result
-    
     def _merge_pois(self, parallel_results: Dict[str, Any]) -> Dict[str, Any]:
-        """Merge POIs from different sources."""
-        all_pois = []
+        """Process POIs from the unified fetching method."""
+        pois = parallel_results.get("pois", [])
         
-        # Merge regular POIs and LLM POIs
-        if parallel_results.get("pois"):
-            all_pois.extend(parallel_results["pois"])
-        
-        if parallel_results.get("llm_pois"):
-            all_pois.extend(parallel_results["llm_pois"])
-        
-        # Remove duplicates based on name similarity
-        unique_pois = self._remove_duplicate_pois(all_pois)
+        # Remove duplicates based on name similarity (in case any exist)
+        unique_pois = self._remove_duplicate_pois(pois)
         
         travel_memory.update_state("pois", unique_pois, "poi_merger")
         travel_memory.update_state("hotels", parallel_results.get("hotels", []), "hotel_merger")
@@ -567,7 +588,7 @@ class TravelPlannerOrchestrator:
             "recent_messages": {
                 topic: message_bus.get_messages(topic, limit=5)
                 for topic in ["agent_events", "geocoding_complete", "pois_fetched", 
-                             "hotels_fetched", "llm_pois_fetched"]
+                             "hotels_fetched"]
             },
             "execution_summary": travel_memory.get_execution_summary(),
             "performance": self.callback_handler.get_performance_summary()

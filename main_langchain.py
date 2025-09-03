@@ -67,9 +67,9 @@ def check_requirements():
         import langchain
         import langchain_core
         import google.generativeai
-        print("✅ LangChain and Gemini packages installed")
+        print(" LangChain and Gemini packages installed")
     except ImportError as e:
-        print(f"❌ Missing required package: {e}")
+        print(f" Missing required package: {e}")
         print("   Install with: pip install langchain langchain-core google-generativeai")
         requirements_met = False
     
@@ -87,8 +87,8 @@ async def demo_trip_planning():
         model="gpt-4o-mini"
     )
     
-    print("🚀 Starting enhanced planning process...")
-    print("📊 Watch the parallel execution of multiple agents!\n")
+    print(" Starting enhanced planning process...")
+    print(" Watch the parallel execution of multiple agents!\n")
     
     # Plan the trip
     result = await orchestrator.plan_trip_async(

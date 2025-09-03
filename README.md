@@ -22,7 +22,6 @@ WanderWise is a full-stack AI travel planner that generates personalized multi-d
 Shared memory drives agent collaboration; the orchestrator coordinates flow and events.
 
 ```mermaid
-%%{init: { 'theme': 'default', 'themeVariables': { 'background': '#ffffff' } }}%%
 graph TB
     subgraph "User Layer"
         USER[👤 User Request]
@@ -94,7 +93,6 @@ graph TB
 Request → Geocode → Parallel (POIs + Hotels) → Enrichment → Route → Itinerary → Summary → Response.
 
 ```mermaid
-%%{init: { 'theme': 'default', 'themeVariables': { 'background': '#ffffff' } }}%%
 sequenceDiagram
     participant User
     participant Orchestrator
@@ -309,4 +307,5 @@ result = client.generate_travel_plan(
 - Detailed error reporting with agent context
 - Partial results when some agents fail
 - Retry mechanisms for transient failures
+
 

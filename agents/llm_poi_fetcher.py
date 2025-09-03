@@ -31,7 +31,7 @@ def geocode_poi_with_geocoder(poi_name: str, location_context: str = "") -> dict
         try:
             print(f"   🔍 Geocoding: '{query}'")
             result = geocode_location(query)
-            print(f"   ✅ Found coordinates: {result['lat']:.4f}, {result['lon']:.4f}")
+            print(f"    Found coordinates: {result['lat']:.4f}, {result['lon']:.4f}")
             return {
                 'lat': result['lat'],
                 'lon': result['lon'],
@@ -41,10 +41,10 @@ def geocode_poi_with_geocoder(poi_name: str, location_context: str = "") -> dict
                 'full_name': result.get('name', poi_name)
             }
         except Exception as e:
-            print(f"   ❌ Failed with '{query}': {e}")
+            print(f"    Failed with '{query}': {e}")
             continue
     
-    print(f"   ⚠️ Could not geocode '{poi_name}', using fallback coordinates")
+    print(f"    Could not geocode '{poi_name}', using fallback coordinates")
     return {
         'lat': 0.0,
         'lon': 0.0,
@@ -55,12 +55,12 @@ def geocode_poi_with_geocoder(poi_name: str, location_context: str = "") -> dict
 def enhance_pois_with_coordinates(pois: list, location_context: str) -> list:
     """Enhance POIs with accurate coordinates using the geocoder"""
     
-    print(f"\n📍 Enhancing {len(pois)} POIs with accurate coordinates...")
+    print(f"\n Enhancing {len(pois)} POIs with accurate coordinates...")
     
     enhanced_pois = []
     
     for i, poi in enumerate(pois, 1):
-        print(f"\n🏛️ Processing {i}/{len(pois)}: {poi.get('name', 'Unknown')}")
+        print(f"\nProcessing {i}/{len(pois)}: {poi.get('name', 'Unknown')}")
         
         # Get coordinates for this POI using the geocoder
         coord_result = geocode_poi_with_geocoder(poi.get('name', ''), location_context)
@@ -81,23 +81,60 @@ def enhance_pois_with_coordinates(pois: list, location_context: str) -> list:
     
     return enhanced_pois
 
-def generate_pois_using_gemini(location: str, scraped_content: list) -> dict:
-    """Generate POIs using Gemini (WITHOUT coordinates)"""
+def generate_pois_using_gemini(location: str, scraped_content: list, travel_style: str = None, interests: str = None) -> dict:
+    """Generate POIs using Gemini (WITHOUT coordinates) considering travel style"""
     
     if not GEMINI_API_KEY:
         return {"pois": []}
     
     try:
-        print("\n🧠 Generating POIs using Gemini (no coordinates)...")
+        style_info = f" (Travel style: {travel_style})" if travel_style else ""
+        print(f"\n Generating POIs using Gemini{style_info} (no coordinates)...")
         
         model = genai.GenerativeModel('gemini-1.5-flash')
         
         combined_content = "\n\n".join(scraped_content[:10]) if scraped_content else ""
         
+        # Build travel style context for the prompt
+        style_context = ""
+        if travel_style:
+            if travel_style.lower() == "relaxed":
+                style_context = """
+Travel Style Context: RELAXED pace
+- Prioritize peaceful, serene locations
+- Include places for rest and contemplation  
+- Favor attractions with minimal walking/physical activity
+- Include parks, gardens, cafes, scenic viewpoints
+- Avoid crowded tourist traps or strenuous activities
+- Focus on quality over quantity of experiences"""
+            elif travel_style.lower() == "moderate":
+                style_context = """
+Travel Style Context: MODERATE pace  
+- Balance of active and relaxing attractions
+- Mix of popular and off-the-beaten-path locations
+- Include both indoor and outdoor activities
+- Consider attractions with moderate walking distances
+- Include cultural sites, museums, local markets
+- Good mix of must-see sights and hidden gems"""
+            elif travel_style.lower() == "packed":
+                style_context = """
+Travel Style Context: PACKED schedule
+- Maximize number of attractions and activities
+- Include all must-see tourist highlights  
+- Prioritize efficient locations close to each other
+- Include active, energetic experiences
+- Focus on iconic landmarks and photo opportunities
+- Optimize for seeing as much as possible"""
+        
+        interests_context = f"\nUser Interests: {interests}" if interests else ""
+        
         prompt = f"""
 Based on this information about {location}, create a comprehensive list of tourist attractions:
 
 {combined_content if combined_content else f"Create a list for {location} using your knowledge."}
+
+{style_context}
+{interests_context}
 
 Return JSON format WITHOUT coordinates:
 {{
@@ -122,6 +159,8 @@ IMPORTANT:
 - Provide detailed, engaging descriptions
 - Use your knowledge of {location} to ensure accuracy
 - Focus on real, well-known tourist attractions
+- STRONGLY consider the travel style when selecting and ordering attractions
+- Tailor recommendations to match the specified pace and preferences
 
 Return only valid JSON, no other text.
 """
@@ -137,11 +176,11 @@ Return only valid JSON, no other text.
         
         poi_data = json.loads(json_text)
         
-        print(f"✅ Generated {len(poi_data.get('pois', []))} POIs from Gemini")
+        print(f" Generated {len(poi_data.get('pois', []))} POIs from Gemini")
         return poi_data
         
     except Exception as e:
-        print(f"❌ Gemini POI generation failed: {e}")
+        print(f" Gemini POI generation failed: {e}")
         return {"pois": []}
 
 def scrape_wikipedia_attractions(location: str) -> list:
@@ -205,15 +244,15 @@ def scrape_wikipedia_attractions(location: str) -> list:
                                     if extract and len(extract) > 100:
                                         wiki_data.append(extract[:800])
                 
-                print(f"   ✅ Found {len(wiki_data)} Wikipedia entries")
+                print(f"Found {len(wiki_data)} Wikipedia entries")
                 time.sleep(1)  # Rate limiting
                 
             except Exception as e:
-                print(f"   ❌ Wikipedia search failed: {e}")
+                print(f"Wikipedia search failed: {e}")
                 continue
                 
     except Exception as e:
-        print(f"❌ Wikipedia scraping error: {e}")
+        print(f"Wikipedia scraping error: {e}")
     
     return wiki_data
 
@@ -247,12 +286,12 @@ def scrape_alternative_sources(location: str) -> list:
         print(f"🗺️ Alternative sources: {len(alt_data)} entries")
         
     except Exception as e:
-        print(f"❌ Alternative sources error: {e}")
+        print(f"Alternative sources error: {e}")
     
     return alt_data
 
-def create_enhanced_fallback_pois(location: str) -> dict:
-    """Enhanced fallback with more comprehensive data (without coordinates)"""
+def create_enhanced_fallback_pois(location: str, travel_style: str = None) -> dict:
+    """Enhanced fallback with more comprehensive data (without coordinates) considering travel style"""
     
     # Expanded fallback database (coordinates removed)
     location_db = {
@@ -361,76 +400,160 @@ def create_enhanced_fallback_pois(location: str) -> dict:
     if location_key in location_db:
         return {"location": location, "pois": location_db[location_key]["attractions"]}
     
-    # Generic fallback
+    # Generic fallback with travel style consideration
+    fallback_pois = []
+    
+    # Base attractions for any location
+    base_attractions = [
+        {
+            "name": f"{location} Main Square",
+            "description": f"The central square and main gathering place in {location}, featuring local architecture, shops, and restaurants. A great starting point to explore the city.",
+            "category": "cultural",
+            "estimated_visit_duration": "1 hour",
+            "significance": "medium",
+            "tags": ["city center", "square", "architecture"],
+            "best_time_to_visit": "any time",
+            "entrance_fee": "free",
+            "accessibility": "easy"
+        },
+        {
+            "name": f"{location} Historic District",
+            "description": f"The historic heart of {location} with traditional buildings, cultural sites, and heritage attractions that showcase the local history and culture.",
+            "category": "historic",
+            "estimated_visit_duration": "2 hours",
+            "significance": "high",
+            "tags": ["historic", "heritage", "culture"],
+            "best_time_to_visit": "morning",
+            "entrance_fee": "free",
+            "accessibility": "easy"
+        }
+    ]
+    
+    # Add travel style specific attractions
+    if travel_style:
+        if travel_style.lower() == "relaxed":
+            base_attractions.extend([
+                {
+                    "name": f"{location} Central Park",
+                    "description": f"A peaceful green space in {location} perfect for relaxation, gentle walks, and enjoying nature. Ideal for unwinding and people-watching.",
+                    "category": "natural",
+                    "estimated_visit_duration": "2 hours",
+                    "significance": "medium",
+                    "tags": ["park", "relaxation", "nature", "peaceful"],
+                    "best_time_to_visit": "afternoon",
+                    "entrance_fee": "free",
+                    "accessibility": "easy"
+                },
+                {
+                    "name": f"{location} Scenic Viewpoint",
+                    "description": f"A tranquil spot offering beautiful views of {location}. Perfect for quiet contemplation and photography without crowds.",
+                    "category": "natural",
+                    "estimated_visit_duration": "1 hour",
+                    "significance": "medium",
+                    "tags": ["viewpoint", "scenic", "photography", "peaceful"],
+                    "best_time_to_visit": "evening",
+                    "entrance_fee": "free",
+                    "accessibility": "moderate"
+                }
+            ])
+        elif travel_style.lower() == "moderate":
+            base_attractions.extend([
+                {
+                    "name": f"{location} Cultural Center",
+                    "description": f"The main cultural hub of {location} featuring exhibitions, performances, and insights into local traditions and arts.",
+                    "category": "cultural",
+                    "estimated_visit_duration": "2 hours",
+                    "significance": "high",
+                    "tags": ["culture", "arts", "exhibitions", "local traditions"],
+                    "best_time_to_visit": "afternoon",
+                    "entrance_fee": "paid",
+                    "accessibility": "easy"
+                },
+                {
+                    "name": f"{location} Local Market",
+                    "description": f"A vibrant local market in {location} where you can experience authentic local life, shop for souvenirs, and taste regional specialties.",
+                    "category": "cultural",
+                    "estimated_visit_duration": "1 hour",
+                    "significance": "medium",
+                    "tags": ["market", "local life", "shopping", "food"],
+                    "best_time_to_visit": "morning",
+                    "entrance_fee": "free",
+                    "accessibility": "easy"
+                }
+            ])
+        elif travel_style.lower() == "packed":
+            base_attractions.extend([
+                {
+                    "name": f"{location} Landmark Tower",
+                    "description": f"The most iconic landmark in {location}, offering panoramic city views and a must-visit experience for tourists seeking the quintessential photo opportunity.",
+                    "category": "historic",
+                    "estimated_visit_duration": "1 hour",
+                    "significance": "high",
+                    "tags": ["landmark", "iconic", "panoramic views", "tourist highlight"],
+                    "best_time_to_visit": "morning",
+                    "entrance_fee": "paid",
+                    "accessibility": "moderate"
+                },
+                {
+                    "name": f"{location} Tourist District",
+                    "description": f"The main tourist hub of {location} packed with attractions, shops, restaurants, and entertainment options all within walking distance.",
+                    "category": "entertainment",
+                    "estimated_visit_duration": "3 hours",
+                    "significance": "high",
+                    "tags": ["tourist district", "entertainment", "shopping", "bustling"],
+                    "best_time_to_visit": "any time",
+                    "entrance_fee": "free",
+                    "accessibility": "easy"
+                }
+            ])
+    
     return {
         "location": location,
-        "pois": [
-            {
-                "name": f"{location} Main Square",
-                "description": f"The central square and main gathering place in {location}, featuring local architecture, shops, and restaurants. A great starting point to explore the city.",
-                "category": "cultural",
-                "estimated_visit_duration": "1 hour",
-                "significance": "medium",
-                "tags": ["city center", "square", "architecture"],
-                "best_time_to_visit": "any time",
-                "entrance_fee": "free",
-                "accessibility": "easy"
-            },
-            {
-                "name": f"{location} Historic District",
-                "description": f"The historic heart of {location} with traditional buildings, cultural sites, and heritage attractions that showcase the local history and culture.",
-                "category": "historic",
-                "estimated_visit_duration": "2 hours",
-                "significance": "high",
-                "tags": ["historic", "heritage", "culture"],
-                "best_time_to_visit": "morning",
-                "entrance_fee": "free",
-                "accessibility": "easy"
-            }
-        ]
+        "pois": base_attractions
     }
 
-def fetch_pois_with_llm(location: str, limit: int = 15) -> list:
-    """Main function that generates POIs and geocodes them separately"""
+def fetch_pois_with_llm(location: str, limit: int = 15, travel_style: str = None, interests: str = None) -> list:
+    """Main function that generates POIs and geocodes them separately, considering travel style"""
     
-    print(f"\n🤖 LLM-Powered POI Discovery for: {location}")
+    style_info = f" (Style: {travel_style})" if travel_style else ""
+    print(f"\n LLM-Powered POI Discovery for: {location}{style_info}")
     print("=" * 50)
     
     scraped_content = []
     
     # Step 1: Google Search (most comprehensive)
-    print("\n🔍 Searching Google for attractions...")
+    print("\n Searching Google for attractions...")
     google_content = scrape_google_custom_search(location)
     scraped_content.extend(google_content)
     
     # Step 2: Wikipedia (reliable but limited)
-    print("\n📚 Searching Wikipedia...")
+    print("\nSearching Wikipedia...")
     wiki_content = scrape_wikipedia_attractions(location)
     scraped_content.extend(wiki_content)
     
     # Step 3: Alternative sources
-    print("\n🗺️ Searching alternative sources...")
+    print("\nSearching alternative sources...")
     alt_content = scrape_alternative_sources(location)
     scraped_content.extend(alt_content)
     
     # Step 4: Travel websites (bonus content)
-    print("\n🌐 Searching travel websites...")
+    print("\nSearching travel websites...")
     travel_content = scrape_travel_websites(location)
     scraped_content.extend(travel_content)
     
-    print(f"✅ Collected {len(scraped_content)} pieces of content")
-    print(f"   🔍 Google: {len(google_content)} entries")
-    print(f"   📚 Wikipedia: {len(wiki_content)} entries") 
-    print(f"   🗺️ Alternative: {len(alt_content)} entries")
-    print(f"   🌐 Travel sites: {len(travel_content)} entries")
+    print(f" Collected {len(scraped_content)} pieces of content")
+    print(f"    Google: {len(google_content)} entries")
+    print(f"    Wikipedia: {len(wiki_content)} entries") 
+    print(f"    Alternative: {len(alt_content)} entries")
+    print(f"    Travel sites: {len(travel_content)} entries")
     
     # Continue with existing Gemini generation...
-    poi_data = generate_pois_using_gemini(location, scraped_content)
+    poi_data = generate_pois_using_gemini(location, scraped_content, travel_style, interests)
         
     # Fallback if Gemini fails
     if not poi_data.get('pois'):
-        print("🔄 Gemini approach failed, trying fallback...")
-        poi_data = create_enhanced_fallback_pois(location)
+        print("Gemini approach failed, trying fallback...")
+        poi_data = create_enhanced_fallback_pois(location, travel_style)
     
     # Step 4: Enhance POIs with coordinates using the geocoder
     enhanced_pois = enhance_pois_with_coordinates(poi_data['pois'], location)
@@ -557,7 +680,7 @@ def scrape_google_custom_search(location: str) -> list:
     google_cse_id = os.getenv("GOOGLE_CSE_ID")
     
     if not google_cse_key or not google_cse_id:
-        print("   ⚠️ Google Custom Search API not configured, skipping...")
+        print("Google Custom Search API not configured, skipping...")
         return []
     
     google_data = []
@@ -579,7 +702,7 @@ def scrape_google_custom_search(location: str) -> list:
                     'num': 5
                 }
                 
-                print(f"🔍 Google CSE: {query}")
+                print(f"Google CSE: {query}")
                 response = requests.get(url, params=params, timeout=10)
                 data = response.json()
                 
@@ -592,10 +715,10 @@ def scrape_google_custom_search(location: str) -> list:
                 time.sleep(1)  # API rate limiting
                 
             except Exception as e:
-                print(f"   ❌ Google CSE error: {e}")
+                print(f"Google CSE error: {e}")
                 continue
     except Exception as e:
-        print(f"❌ Google CSE setup error: {e}")
+        print(f"Google CSE setup error: {e}")
     
     return google_data
 
@@ -634,11 +757,11 @@ def scrape_travel_websites(location: str) -> list:
                 time.sleep(3)  # Respectful rate limiting
                 
             except Exception as e:
-                print(f"   ❌ Travel site scraping failed: {e}")
+                print(f"Travel site scraping failed: {e}")
                 continue
                 
     except Exception as e:
-        print(f"❌ Travel sites error: {e}")
+        print(f"Travel sites error: {e}")
     
     return travel_data
 
@@ -654,7 +777,7 @@ def fetch_pois_hybrid_with_preferences(lat: float, lon: float, destination: str,
     all_pois = []
     
     # Step 1: Get OpenTripMap POIs filtered by categories
-    print("📡 Step 1: Fetching from OpenTripMap API...")
+    print("Step 1: Fetching from OpenTripMap API...")
     try:
         poi_categories = vacation_preferences.get('poi_categories', ['interesting_places'])
         # Convert categories to OpenTripMap 'kinds' format
@@ -679,11 +802,11 @@ def fetch_pois_hybrid_with_preferences(lat: float, lon: float, destination: str,
         otm_kinds = list(set(otm_kinds))
         
         otm_pois = fetch_pois(lat, lon, kinds=otm_kinds)
-        print(f"   ✅ OpenTripMap: {len(otm_pois)} POIs")
+        print(f"OpenTripMap: {len(otm_pois)} POIs")
         all_pois.extend(otm_pois)
         
     except Exception as e:
-        print(f"   ❌ OpenTripMap error: {e}")
+        print(f"OpenTripMap error: {e}")
     
     # Step 2: Get LLM POIs with preferences
     print("🤖 Step 2: LLM-based POI discovery with preferences...")

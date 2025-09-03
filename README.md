@@ -17,134 +17,18 @@ WanderWise is a full-stack AI travel planner that generates personalized multi-d
 | Auth & Rate Limit | Simple API key protection (dev key included) |
 | Docker Ready | Compose setup for deployment |
 
-## Architecture (High-Level)
+## System Architecture Overview
 
-Shared memory drives agent collaboration; the orchestrator coordinates flow and events.
+![System Architecture](./docs/images/system-architecture.png)
 
-```mermaid
-graph TB
-    subgraph "User Layer"
-        USER[👤 User Request]
-        API[📤 API Response]
-    end
-    
-    subgraph "Orchestration Layer"
-        ORCH[🎯 Travel Orchestrator]
-    end
-    
-    subgraph SM ["Shared Memory Core"]
-        TM[🧠 TravelPlannerMemory<br/>• Thread-Safe State Store<br/>• Centralized Data Hub<br/>• Agent Coordination]
-        MB[📡 MessageBus<br/>• Pub/Sub Events<br/>• Real-time Communication<br/>• Agent Notifications]
-    end
-    
-    subgraph "AI Agent Pipeline"
-        direction LR
-        GEO[🌍 Geocoding<br/>Agent]
-        POI[🎯 POI<br/>Agent]
-        HOTEL[🏨 Hotel<br/>Agent]
-        REVIEW[⭐ Review<br/>Agent]
-        DESC[📝 Description<br/>Agent]
-        ROUTE[🛣️ Route<br/>Agent]
-        ITIN[📅 Itinerary<br/>Agent]
-        SUM[📋 Summary<br/>Agent]
-        
-        GEO --> POI
-        POI --> HOTEL
-        HOTEL --> REVIEW
-        REVIEW --> DESC
-        DESC --> ROUTE
-        ROUTE --> ITIN
-        ITIN --> SUM
-    end
-    
-    USER --> ORCH
-    ORCH <--> TM
-    ORCH <--> MB
-    
-    %% All agents interact with shared memory
-    GEO <--> TM
-    POI <--> TM
-    HOTEL <--> TM
-    REVIEW <--> TM
-    DESC <--> TM
-    ROUTE <--> TM
-    ITIN <--> TM
-    SUM <--> TM
-    
-    %% All agents publish events to message bus
-    GEO -.-> MB
-    POI -.-> MB
-    HOTEL -.-> MB
-    REVIEW -.-> MB
-    DESC -.-> MB
-    ROUTE -.-> MB
-    ITIN -.-> MB
-    SUM -.-> MB
-    
-    ORCH --> API
-    
-    style TM fill:#e1f5fe,stroke:#01579b,stroke-width:3px
-    style MB fill:#f3e5f5,stroke:#4a148c,stroke-width:3px
-    style ORCH fill:#fff3e0,stroke:#e65100,stroke-width:3px
-```
+*High-level view of the multi-agent system with shared memory coordination*
 
-## Data Flow (Execution Phases)
+## Detailed Data Flow
 
-Request → Geocode → Parallel (POIs + Hotels) → Enrichment → Route → Itinerary → Summary → Response.
+![Data Flow Diagram](./docs/images/data-flow-diagram.png)
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Orchestrator
-    participant Memory as TravelPlannerMemory
-    participant Bus as MessageBus
-    participant GeoAgent as Geocoding Agent
-    participant POIAgent as POI Agent
-    participant HotelAgent as Hotel Agent
-    participant RouteAgent as Route Agent
-    participant ItinAgent as Itinerary Agent
-    participant SumAgent as Summary Agent
+*Sequential execution phases showing agent interactions and data flow*
 
-    User->>Orchestrator: Travel Request
-    Orchestrator->>Memory: reset_shared_state()
-    
-    Note over Orchestrator: Phase 1: Geocoding
-    Orchestrator->>GeoAgent: geocode(location)
-    GeoAgent->>Memory: update_state("location", location_data, "geocoding_agent")
-    GeoAgent->>Memory: update_state("coordinates", {lat, lng}, "geocoding_agent")
-    GeoAgent->>Bus: publish("geocoding_complete", result)
-    
-    Note over Orchestrator: Phase 2: Parallel Fetching
-    par POI Fetching
-        Orchestrator->>POIAgent: fetch_pois()
-        POIAgent->>Memory: get_state("coordinates")
-        POIAgent->>Memory: update_state("pois", pois_list, "poi_agent")
-        POIAgent->>Bus: publish("pois_fetched", {count: N})
-    and Hotel Fetching
-        Orchestrator->>HotelAgent: fetch_hotels()
-        HotelAgent->>Memory: get_state("coordinates")
-        HotelAgent->>Memory: update_state("hotels", hotels_list, "hotel_agent")
-        HotelAgent->>Bus: publish("hotels_fetched", {count: N})
-    end
-    
-    Note over Orchestrator: Phase 3: Route & Itinerary
-    Orchestrator->>RouteAgent: calculate_route()
-    RouteAgent->>Memory: get_state("pois")
-    RouteAgent->>Memory: update_state("route", route_data, "routing_agent")
-    RouteAgent->>Bus: publish("route_calculated", route_info)
-    
-    Orchestrator->>ItinAgent: generate_itinerary()
-    ItinAgent->>Memory: get_state() [all data]
-    ItinAgent->>Memory: update_state("itinerary", itinerary_data, "itinerary_agent")
-    ItinAgent->>Bus: publish("itinerary_generated", itinerary_info)
-    
-    Orchestrator->>SumAgent: generate_summary()
-    SumAgent->>Memory: get_state("itinerary")
-    SumAgent->>Memory: update_state("final_summary", summary_text, "summary_agent")
-    
-    Orchestrator->>Memory: get_state() [complete plan]
-    Orchestrator->>User: Complete Travel Plan
-```
 
 ## Quick Start
 

@@ -336,7 +336,7 @@ class TravelPlannerOrchestrator:
         
         # Handle error cases
         if isinstance(coords, dict) and "error" in coords:
-            print(f"⚠️ Skipping hotel fetch due to geocoding error: {coords['error']}")
+            print(f" Skipping hotel fetch due to geocoding error: {coords['error']}")
             return []
         
         # Handle different coordinate formats
@@ -344,11 +344,11 @@ class TravelPlannerOrchestrator:
             lat = coords.get("latitude") or coords.get("lat")
             lng = coords.get("longitude") or coords.get("lng") or coords.get("lon")
         else:
-            print(f"⚠️ Invalid coordinates format: {coords}")
+            print(f" Invalid coordinates format: {coords}")
             return []
         
         if not lat or not lng:
-            print(f"⚠️ Missing latitude/longitude in coordinates: {coords}")
+            print(f" Missing latitude/longitude in coordinates: {coords}")
             return []
         
         # Prepare hotel search parameters
@@ -361,10 +361,6 @@ class TravelPlannerOrchestrator:
         # Add budget if available
         if inputs.get("budget"):
             hotel_params["budget"] = inputs["budget"]
-            
-        # Add group size if available  
-        if inputs.get("group_size"):
-            hotel_params["group_size"] = inputs["group_size"]
         
         result = self.tools["hotel_fetching_tool"].run(hotel_params)
         

@@ -1,94 +1,218 @@
-# WanderWise: AI-Powered Travel Planner
+# WanderWise: AI Travel Planner
 
 ## Overview
 
-WanderWise is a sophisticated multi-agent travel planning system that provides intelligent, personalized travel recommendations using advanced AI orchestration. The system now offers multiple interfaces including CLI, web API, and a beautiful web interface.
+WanderWise is a full-stack AI travel planner that generates personalized multi-day itineraries using a coordinated set of specialized agents. It combines a FastAPI backend, Next.js frontend, and a shared-memory LangChain orchestration layer.
 
-### Key Features
+### Core Features
 
-- **Multi-Agent Architecture**: Specialized agents for geocoding, POI discovery, hotel recommendations, and itinerary generation
-- **LangChain Orchestration**: Advanced agent coordination with parallel execution and shared memory
-- **AI-Powered Itinerary**: Smart day-by-day planning using Google Gemini or open-source LLMs
-- **FastAPI Web Interface**: Complete RESTful API with interactive documentation and web UI
-- **Docker Ready**: Containerized deployment with Docker and Docker Compose
-- **Flexible LLM Support**: Google Gemini integration with fallback to open-source models
+| Capability | Description |
+|------------|-------------|
+| Multi-Agent Pipeline | Geocoding, POIs, hotels, enrichment, routing, itinerary, summary |
+| Shared Memory + Bus | Thread-safe state + pub/sub event coordination |
+| Smart Itinerary | LLM-enhanced day-by-day plans with final summary |
+| Frontend UI | Modern Next.js interface with progress + results tabs |
+| Hotels & POIs | Ranked POIs and hotels (with website links) |
+| Route Planning | Segment-based route with distance & time |
+| Auth & Rate Limit | Simple API key protection (dev key included) |
+| Docker Ready | Compose setup for deployment |
+
+## Architecture (High-Level)
+
+Shared memory drives agent collaboration; the orchestrator coordinates flow and events.
+
+```mermaid
+graph TB
+    subgraph "User Layer"
+        USER[👤 User Request]
+        API[📤 API Response]
+    end
+    
+    subgraph "Orchestration Layer"
+        ORCH[🎯 Travel Orchestrator]
+    end
+    
+    subgraph SM ["Shared Memory Core"]
+        TM[🧠 TravelPlannerMemory<br/>• Thread-Safe State Store<br/>• Centralized Data Hub<br/>• Agent Coordination]
+        MB[📡 MessageBus<br/>• Pub/Sub Events<br/>• Real-time Communication<br/>• Agent Notifications]
+    end
+    
+    subgraph "AI Agent Pipeline"
+        direction LR
+        GEO[🌍 Geocoding<br/>Agent]
+        POI[🎯 POI<br/>Agent]
+        HOTEL[🏨 Hotel<br/>Agent]
+        REVIEW[⭐ Review<br/>Agent]
+        DESC[📝 Description<br/>Agent]
+        ROUTE[🛣️ Route<br/>Agent]
+        ITIN[📅 Itinerary<br/>Agent]
+        SUM[📋 Summary<br/>Agent]
+        
+        GEO --> POI
+        POI --> HOTEL
+        HOTEL --> REVIEW
+        REVIEW --> DESC
+        DESC --> ROUTE
+        ROUTE --> ITIN
+        ITIN --> SUM
+    end
+    
+    USER --> ORCH
+    ORCH <--> TM
+    ORCH <--> MB
+    
+    %% All agents interact with shared memory
+    GEO <--> TM
+    POI <--> TM
+    HOTEL <--> TM
+    REVIEW <--> TM
+    DESC <--> TM
+    ROUTE <--> TM
+    ITIN <--> TM
+    SUM <--> TM
+    
+    %% All agents publish events to message bus
+    GEO -.-> MB
+    POI -.-> MB
+    HOTEL -.-> MB
+    REVIEW -.-> MB
+    DESC -.-> MB
+    ROUTE -.-> MB
+    ITIN -.-> MB
+    SUM -.-> MB
+    
+    ORCH --> API
+    
+    style TM fill:#e1f5fe,stroke:#01579b,stroke-width:3px
+    style MB fill:#f3e5f5,stroke:#4a148c,stroke-width:3px
+    style ORCH fill:#fff3e0,stroke:#e65100,stroke-width:3px
+```
+
+## Data Flow (Execution Phases)
+
+Request → Geocode → Parallel (POIs + Hotels) → Enrichment → Route → Itinerary → Summary → Response.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Orchestrator
+    participant Memory as TravelPlannerMemory
+    participant Bus as MessageBus
+    participant GeoAgent as Geocoding Agent
+    participant POIAgent as POI Agent
+    participant HotelAgent as Hotel Agent
+    participant RouteAgent as Route Agent
+    participant ItinAgent as Itinerary Agent
+    participant SumAgent as Summary Agent
+
+    User->>Orchestrator: Travel Request
+    Orchestrator->>Memory: reset_shared_state()
+    
+    Note over Orchestrator: Phase 1: Geocoding
+    Orchestrator->>GeoAgent: geocode(location)
+    GeoAgent->>Memory: update_state("location", location_data, "geocoding_agent")
+    GeoAgent->>Memory: update_state("coordinates", {lat, lng}, "geocoding_agent")
+    GeoAgent->>Bus: publish("geocoding_complete", result)
+    
+    Note over Orchestrator: Phase 2: Parallel Fetching
+    par POI Fetching
+        Orchestrator->>POIAgent: fetch_pois()
+        POIAgent->>Memory: get_state("coordinates")
+        POIAgent->>Memory: update_state("pois", pois_list, "poi_agent")
+        POIAgent->>Bus: publish("pois_fetched", {count: N})
+    and Hotel Fetching
+        Orchestrator->>HotelAgent: fetch_hotels()
+        HotelAgent->>Memory: get_state("coordinates")
+        HotelAgent->>Memory: update_state("hotels", hotels_list, "hotel_agent")
+        HotelAgent->>Bus: publish("hotels_fetched", {count: N})
+    end
+    
+    Note over Orchestrator: Phase 3: Route & Itinerary
+    Orchestrator->>RouteAgent: calculate_route()
+    RouteAgent->>Memory: get_state("pois")
+    RouteAgent->>Memory: update_state("route", route_data, "routing_agent")
+    RouteAgent->>Bus: publish("route_calculated", route_info)
+    
+    Orchestrator->>ItinAgent: generate_itinerary()
+    ItinAgent->>Memory: get_state() [all data]
+    ItinAgent->>Memory: update_state("itinerary", itinerary_data, "itinerary_agent")
+    ItinAgent->>Bus: publish("itinerary_generated", itinerary_info)
+    
+    Orchestrator->>SumAgent: generate_summary()
+    SumAgent->>Memory: get_state("itinerary")
+    SumAgent->>Memory: update_state("final_summary", summary_text, "summary_agent")
+    
+    Orchestrator->>Memory: get_state() [complete plan]
+    Orchestrator->>User: Complete Travel Plan
+```
 
 ## Quick Start
 
-### Web API (Recommended)
-
+Backend:
 ```bash
-# Install dependencies
+python -m venv env
+source env/bin/activate
 pip install -r requirements_fastapi.txt
-
-# Start the web server
-python start_api.py
+uvicorn api.main:app --reload --port 8000
 ```
 
-Then visit:
-- **Web Interface**: http://localhost:8000/web
-- **API Documentation**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/health
-
-### Command Line Interface
-
+Frontend:
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run with LangChain orchestration
-python main_langchain.py "Paris, France" "2024-06-01" "2024-06-03"
+cd frontend
+npm install
+npm run dev
 ```
 
-## Architecture
+Open UI: http://localhost:3000
 
-### Core Components
+API Docs: http://localhost:8000/docs
 
-1. **TravelPlannerOrchestrator**: Main orchestration class that coordinates all agents
-2. **Agent Tools**: LangChain tool wrappers for each travel planning agent
-3. **Shared Memory**: Thread-safe memory system for agent communication
-4. **Message Bus**: Pub/sub system for real-time agent coordination
-5. **CLI Interface**: Enhanced command-line interface with real-time status
+Dev API Key: `wanderwise-dev-key-2024`
 
-### Agent Workflow
+## Minimal API Surface
 
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | /generate-travel-plan | Generate full plan |
+| GET | /health | Health check |
+| GET | /docs | Swagger UI |
+
+Request body fields (core): destination, start_date, end_date, preferences (budget, travel_style, group_size, interests[]).
+
+## Output Structure
+
+Response includes:
+* executive_summary (now final summary)
+* points_of_interest (name, rating, description, coordinates)
+* hotels (name, rating, website)
+* itinerary (days → activities with times)
+* routes (segments, distance, duration)
+* file_paths (saved artifacts)
+
+## CLI (Optional)
+```bash
+pip install -r requirements_langchain.txt
+python main_langchain.py --location "Rome, Italy" --duration 3
 ```
-┌─────────────────┐
-│   User Input    │
-└─────────┬───────┘
-          │
-          ▼
-┌─────────────────┐
-│ Geocoding Agent │
-└─────────┬───────┘
-          │
-          ▼
-┌─────────────────────────────────────┐
-│         Parallel Execution          │
-├─────────────────┬───────────────────┤
-│   POI Agent     │   Hotel Agent     │
-│      +          │                   │
-│ LLM POI Agent   │                   │
-└─────────┬───────┴───────────────────┘
-          │
-          ▼
-┌─────────────────┐
-│  POI Enrichment │
-├─────────────────┤
-│ • Merge POIs    │
-│ • Rank Reviews  │
-│ • Descriptions  │
-└─────────┬───────┘
-          │
-          ▼
-┌─────────────────┐
-│ Route & Itinerary│
-├─────────────────┤
-│ • Calculate Route│
-│ • Generate Plan  │
-│ • Final Summary  │
-└─────────────────┘
-```
+
+## Project Status
+
+- Core pipeline stable (POIs, hotels, route, itinerary, summary)
+- Hotels now surface website links (price/description removed)
+- Frontend aligned with simplified hotel model
+- Final summary replaces generic executive summary
+- Ready for deployment link insertion later
+
+## Next Steps (Planned)
+
+- Deployment URL & badge
+- User auth & persistence backend
+- Caching & retry policies
+- Export (PDF / share link)
+
+## Additional Docs
+
+See: `README_FASTAPI.md`, `README_LANGCHAIN.md`, `README_AUTHENTICATION.md` for deeper details.
 
 ## Installation
 
@@ -104,65 +228,6 @@ export GEMINI_API_KEY="your-api-key-here"
 
 Get your free API key from: https://makersuite.google.com/app/apikey
 
-### Open-Source Alternative
-
-The system supports fallback mode for open-source deployment:
-
-1. **Fallback Mode**: Works without any API key (limited LLM functionality)
-```bash
-python main_langchain.py --location "Tokyo, Japan"  # Uses fallback automatically
-```
-
-2. **Hugging Face Models** (optional): Install transformers for local models
-```bash
-pip install transformers torch
-# The system will automatically use local models if available
-```
-
-3. **Ollama Integration** (advanced): For fully local LLM deployment
-```bash
-# Install Ollama and pull a model
-ollama pull llama2
-# Then modify the orchestrator to use Ollama via LangChain
-```
-
-## Usage
-
-### Interactive Mode (Recommended)
-```bash
-python main_langchain.py --interactive
-```
-
-### Command Line Mode
-```bash
-# With Gemini API (full functionality)
-python main_langchain.py --location "Tokyo, Japan" --duration 5 --interests "culture, food, technology"
-
-# With explicit API key
-python main_langchain.py --api-key "your-key" --location "Tokyo, Japan" --duration 5
-
-# Open-source fallback mode (no API key required)
-python main_langchain.py --location "Tokyo, Japan" --duration 5
-
-# Require API key (no fallback)
-python main_langchain.py --no-fallback --location "Tokyo, Japan"
-```
-
-### Demo Mode
-```bash
-python main_langchain.py --demo
-```
-
-### Real-time Status Monitoring
-While the planner is running, you can check status in another terminal:
-```bash
-python -c "
-from langchain_orchestrator import TravelPlannerOrchestrator
-orchestrator = TravelPlannerOrchestrator()
-status = orchestrator.get_real_time_status()
-print(status)
-"
-```
 
 ## Interfaces
 
@@ -214,19 +279,6 @@ result = client.generate_travel_plan(
 )
 ```
 
-## Deployment
-
-### Docker Deployment
-
-```bash
-# Using Docker Compose (recommended)
-docker-compose up --build
-
-# Using Docker directly
-docker build -t wanderwise .
-docker run -p 8000:8000 -e GEMINI_API_KEY="your-key" wanderwise
-```
-
 ### Environment Variables
 
 - `GEMINI_API_KEY` - Google Gemini API key (optional, uses fallback if not set)
@@ -256,136 +308,3 @@ docker run -p 8000:8000 -e GEMINI_API_KEY="your-key" wanderwise
 - Partial results when some agents fail
 - Retry mechanisms for transient failures
 
-## API Reference
-
-### TravelPlannerOrchestrator
-
-```python
-from langchain_orchestrator import TravelPlannerOrchestrator
-
-orchestrator = TravelPlannerOrchestrator(
-    api_key="your-openai-key",
-    model="gpt-4o-mini"
-)
-
-# Asynchronous planning
-result = await orchestrator.plan_trip_async(
-    location="Paris, France",
-    interests="art, history, cuisine",
-    duration=4
-)
-
-# Synchronous planning
-result = orchestrator.plan_trip(
-    location="Paris, France",
-    interests="art, history, cuisine", 
-    duration=4
-)
-
-# Real-time status
-status = orchestrator.get_real_time_status()
-```
-
-### Shared Memory System
-
-```python
-from langchain_orchestrator import travel_memory, message_bus
-
-# Access shared state
-state = travel_memory.get_state()
-pois = travel_memory.get_state("pois")
-
-# Subscribe to agent events
-def on_poi_update(message):
-    print(f"POIs updated: {message}")
-
-message_bus.subscribe("pois_fetched", on_poi_update)
-```
-
-### Custom Agent Tools
-
-```python
-from langchain_orchestrator import TRAVEL_TOOLS
-
-# Access individual tools
-geocoding_tool = next(tool for tool in TRAVEL_TOOLS if tool.name == "geocoding_tool")
-result = geocoding_tool.run("Tokyo, Japan")
-```
-
-## Configuration
-
-### Environment Variables
-- `OPENAI_API_KEY`: Required for LLM-based features
-- `GOOGLE_MAPS_API_KEY`: Required for Maps integration
-- `GEMINI_API_KEY`: Required for Gemini LLM features
-
-### Model Selection
-Supported OpenAI models:
-- `gpt-4o-mini` (default, cost-effective)
-- `gpt-4o` (higher quality, more expensive)
-- `gpt-3.5-turbo` (fastest, lower quality)
-
-## Output Files
-
-The system generates several output files:
-
-1. **Complete Results** (`*_complete.json`): Full execution results with all agent data
-2. **Summary** (`*_summary.txt`): Human-readable trip summary and itinerary
-3. **Route Map** (`*_map.html`): Interactive map with route and POIs
-4. **Performance Log** (`*_performance.json`): Detailed execution metrics
-
-## Performance Benchmarks
-
-Typical execution times (Tokyo example):
-- **Sequential (original)**: ~45-60 seconds
-- **Parallel (LangChain)**: ~25-35 seconds
-- **Performance gain**: ~40-50% improvement
-
-Agent execution breakdown:
-- Geocoding: ~2 seconds
-- Parallel POI/Hotel fetch: ~15 seconds (vs 25 sequential)
-- POI enrichment: ~8 seconds
-- Route/Itinerary: ~10 seconds
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Missing API Keys**
-   ```
-   Error: OPENAI_API_KEY not found
-   Solution: Set environment variable or pass api_key parameter
-   ```
-
-2. **Agent Timeout**
-   ```
-   Error: Agent execution timeout
-   Solution: Check network connectivity and API limits
-   ```
-
-3. **Memory Issues**
-   ```
-   Error: Shared state corruption
-   Solution: Call reset_shared_state() before new planning session
-   ```
-
-### Debug Mode
-Enable detailed logging:
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
-
-## Contributing
-
-When adding new agents or features:
-
-1. Create agent tool wrapper in `agent_tools.py`
-2. Update orchestrator chains in `orchestrator.py`
-3. Add monitoring hooks for performance tracking
-4. Update CLI interface if needed
-5. Add tests for new functionality
-
-## License
-
-This enhanced version maintains the same license as the original travel planner project.

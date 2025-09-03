@@ -26,7 +26,9 @@ from api.models import (
     PointOfInterest,
     Hotel,
     ItineraryDay,
-    ItineraryActivity
+    ItineraryActivity,
+    RouteSegment,
+    Route
 )
 from api.web_interface import add_web_interface
 from api.auth import get_current_user, get_optional_user, check_rate_limit, auth_config
@@ -124,13 +126,6 @@ def format_travel_plan_response(
     hotels = []
     if 'hotels' in output_data:
         for hotel in output_data['hotels']:
-            # Get description from various possible sources
-            description = (
-                hotel.get('description') or 
-                hotel.get('google_reviews', {}).get('name') or
-                'No description available'
-            )
-            
             # Get rating from Google reviews if available
             rating = None
             if 'google_reviews' in hotel and hotel['google_reviews'].get('rating'):
@@ -140,10 +135,36 @@ def format_travel_plan_response(
             
             hotels.append(Hotel(
                 name=hotel.get('name', ''),
-                price=hotel.get('price', 'N/A'),
                 rating=rating,
-                description=description
+                website=hotel.get('website')
             ))
+    
+    # Extract route data
+    routes = None
+
+    if 'route_structured' in output_data:
+        route_data = output_data['route_structured']
+        print(f"   Route data type: {type(route_data)}")
+        print(f"   Route data keys: {route_data.keys() if isinstance(route_data, dict) else 'Not a dict'}")
+        
+        # Extract route segments
+        route_segments = []
+        for segment in route_data.get('segments', []):
+            route_segments.append(RouteSegment(
+                from_poi=segment.get('from_poi', ''),
+                to_poi=segment.get('to_poi', ''),
+                geometry=segment.get('geometry', []),
+                distance_km=segment.get('distance_km', 0),
+                duration_minutes=segment.get('duration_minutes', 0),
+                instructions=segment.get('instructions', [])
+            ))
+        
+        if route_segments:
+            routes = Route(
+                segments=route_segments,
+                total_distance_km=route_data.get('total_distance_km', 0),
+                total_duration_minutes=route_data.get('total_duration_minutes', 0)
+            )
     
     # Extract itinerary - handle the LLM-generated format
     itinerary = []
@@ -198,6 +219,7 @@ def format_travel_plan_response(
         points_of_interest=pois,
         hotels=hotels,
         itinerary=itinerary,
+        routes=routes,
         generation_timestamp=datetime.now(),
         file_paths=file_paths
     )
@@ -286,8 +308,24 @@ async def generate_travel_plan(
         state = result.get("state", {})
         result_data = result.get("result", {})
         
-        # Use result_data if state is empty, otherwise use state
-        output_data = result_data if result_data and not state else state
+
+        # Merge data sources - result_data has route_structured, state has other fields
+        # Priority: result_data first, then fill gaps with state
+        if result_data and state:
+            output_data = {**state, **result_data}  # result_data overrides state
+            print(f"   Using: merged (result_data priority)")
+        elif result_data:
+            output_data = result_data
+            print(f"   Using: result_data only")
+        else:
+            output_data = state
+            print(f"   Using: state only")
+        print(f"   Final output_data keys: {list(output_data.keys()) if output_data else 'Empty/None'}")
+        
+
+        if 'route_structured' in output_data:
+            print(f"   route_structured type: {type(output_data['route_structured'])}")
+            print(f"   route_structured length: {len(output_data['route_structured']) if output_data['route_structured'] else 0}")
         
         # Save results to files using the CLI save method
         try:

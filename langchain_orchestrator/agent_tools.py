@@ -104,9 +104,21 @@ class LLMPOIFetchingTool(BaseTool):
     ) -> List[Dict[str, Any]]:
         """Execute the LLM POI fetching tool."""
         try:
-            pois = fetch_pois_with_llm(location, interests)
+            # Get travel style from shared memory if available
+            from .shared_memory import travel_memory
+            user_preferences = travel_memory.get_state("user_preferences") or {}
+            travel_style = user_preferences.get("travel_style")
+            
+            # The enhanced fetch_pois_with_llm function now accepts travel_style and interests
+            pois = fetch_pois_with_llm(
+                location=location, 
+                limit=15, 
+                travel_style=travel_style,
+                interests=interests
+            )
             if run_manager:
-                run_manager.on_text(f"LLM found {len(pois)} POIs for {location}", verbose=True)
+                style_info = f" (style: {travel_style})" if travel_style else ""
+                run_manager.on_text(f"LLM found {len(pois)} POIs for {location}{style_info}", verbose=True)
             return pois
         except Exception as e:
             return [{"error": f"LLM POI fetching failed: {str(e)}"}]
@@ -140,18 +152,31 @@ class HotelFetchingTool(BaseTool):
     ) -> List[Dict[str, Any]]:
         """Execute the hotel fetching tool."""
         try:
-            # Pass additional parameters to the hotel agent
+            # Map budget to vacation_type if possible
+            vacation_type = "mixed"  # Default
+            if budget:
+                if "luxury" in budget.lower() or "high" in budget.lower():
+                    vacation_type = "relaxing_break"  # Spa/luxury hotels
+                elif "budget" in budget.lower() or "low" in budget.lower():
+                    vacation_type = "active_adventure"  # More affordable options
+            
+            # Call suggest_hotels with correct parameter order
             hotels = suggest_hotels(
-                location_name, 
-                latitude, 
-                longitude,
-                budget=budget,
-                group_size=group_size
+                destination=location_name,
+                lat=latitude, 
+                lon=longitude,
+                vacation_type=vacation_type
             )
+            
+            print(f"🏨 Hotel tool found {len(hotels)} hotels for {location_name}")
+            
             if run_manager:
                 run_manager.on_text(f"Found {len(hotels)} hotels near {location_name}", verbose=True)
             return hotels
         except Exception as e:
+            print(f"❌ Hotel fetching failed: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return [{"error": f"Hotel fetching failed: {str(e)}"}]
 
 

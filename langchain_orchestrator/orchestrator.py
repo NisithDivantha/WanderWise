@@ -332,11 +332,13 @@ class TravelPlannerOrchestrator:
     
     def _fetch_hotels(self, inputs: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Fetch hotels."""
+        print(f"🏨 _fetch_hotels called with inputs keys: {list(inputs.keys())}")
         coords = inputs["coordinates"]
+        print(f"🏨 Coordinates received: {coords}")
         
         # Handle error cases
         if isinstance(coords, dict) and "error" in coords:
-            print(f" Skipping hotel fetch due to geocoding error: {coords['error']}")
+            print(f"🏨 Skipping hotel fetch due to geocoding error: {coords['error']}")
             return []
         
         # Handle different coordinate formats
@@ -344,12 +346,14 @@ class TravelPlannerOrchestrator:
             lat = coords.get("latitude") or coords.get("lat")
             lng = coords.get("longitude") or coords.get("lng") or coords.get("lon")
         else:
-            print(f" Invalid coordinates format: {coords}")
+            print(f"🏨 Invalid coordinates format: {coords}")
             return []
         
         if not lat or not lng:
-            print(f" Missing latitude/longitude in coordinates: {coords}")
+            print(f"🏨 Missing latitude/longitude in coordinates: {coords}")
             return []
+        
+        print(f"🏨 Using coordinates: lat={lat}, lng={lng}, location={inputs['location']}")
         
         # Prepare hotel search parameters
         hotel_params = {
@@ -362,24 +366,44 @@ class TravelPlannerOrchestrator:
         if inputs.get("budget"):
             hotel_params["budget"] = inputs["budget"]
         
-        result = self.tools["hotel_fetching_tool"].run(hotel_params)
+        print(f"🏨 Hotel params: {hotel_params}")
         
-        message_bus.publish("hotels_fetched", {"count": len(result)}, "hotel_agent")
-        return result
+        try:
+            result = self.tools["hotel_fetching_tool"].run(hotel_params)
+            print(f"🏨 Hotel tool returned: {len(result) if result else 0} results")
+            
+            message_bus.publish("hotels_fetched", {"count": len(result)}, "hotel_agent")
+            return result
+        except Exception as e:
+            print(f"🏨 Hotel fetching exception: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return []
     
     def _merge_pois(self, parallel_results: Dict[str, Any]) -> Dict[str, Any]:
         """Process POIs from the unified fetching method."""
+        print(f"🔍 _merge_pois called with parallel_results keys: {list(parallel_results.keys())}")
+        
         pois = parallel_results.get("pois", [])
+        hotels = parallel_results.get("hotels", [])
+        
+        print(f"🔍 POIs found: {len(pois)}")
+        print(f"🔍 Hotels found: {len(hotels)}")
+        
+        if hotels:
+            print(f"🏨 Hotel data example: {hotels[0] if hotels else 'None'}")
+        else:
+            print(f"🏨 No hotels in parallel results")
         
         # Remove duplicates based on name similarity (in case any exist)
         unique_pois = self._remove_duplicate_pois(pois)
         
         travel_memory.update_state("pois", unique_pois, "poi_merger")
-        travel_memory.update_state("hotels", parallel_results.get("hotels", []), "hotel_merger")
+        travel_memory.update_state("hotels", hotels, "hotel_merger")
         
         return {
             "pois": unique_pois,
-            "hotels": parallel_results.get("hotels", [])
+            "hotels": hotels
         }
     
     def _remove_duplicate_pois(self, pois: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -467,9 +491,69 @@ class TravelPlannerOrchestrator:
         
         if pois:
             route = self.tools["route_calculation_tool"].run({"pois": pois, "hotels": hotels})
+            
+            # # Debug: Print routing result details
+            # print(f"🗺️ Routing Agent Result:")
+            # print(f"   Route type: {type(route)}")
+            # print(f"   Route keys: {route.keys() if isinstance(route, dict) else 'Not a dict'}")
+            
+            # if isinstance(route, dict):
+            #     if 'error' in route:
+            #         print(f"   ❌ Error: {route['error']}")
+            #     else:
+            #         print(f"   📏 Distance: {route.get('distance_km', 'N/A')} km")
+            #         print(f"   ⏱️ Duration: {route.get('duration_min', 'N/A')} minutes")
+            #         print(f"   🔢 Steps count: {len(route.get('steps', []))}")
+            #         print(f"   🗺️ Geometry points: {len(route.get('geometry', []))}")
+                    
+            #         # Show first few steps
+            #         steps = route.get('steps', [])
+            #         if steps:
+            #             print(f"   📍 First 3 steps:")
+            #             for i, step in enumerate(steps[:3]):
+            #                 instruction = step.get('instruction', 'No instruction')[:50]
+            #                 distance = step.get('distance', 0)
+            #                 print(f"      {i+1}. {instruction}... ({distance}m)")
+            
             travel_memory.update_state("route", route, "routing_agent")
             message_bus.publish("route_calculated", route, "routing_agent")
             data["route"] = route
+            
+            # Convert route data to structured format for API response
+            if route and isinstance(route, dict) and 'geometry' in route and not route.get('error'):
+                # Create route segments from geometry and POIs
+                geometry = route.get('geometry', [])
+                if geometry and pois:
+                    # Create a single route segment connecting all POIs
+                    route_segments = []
+                    
+                    # For simplicity, create one segment from first to last POI
+                    # In a more complex implementation, we could split by POI locations
+                    if len(pois) >= 2:
+                        first_poi = pois[0].get('name', 'Start')
+                        last_poi = pois[-1].get('name', 'End')
+                        
+                        # Convert geometry from routing agent format to frontend format
+                        # The routing agent returns coordinates, but we need to ensure correct lat/lng mapping
+                        # Based on the data, swap coordinates: point[0]=lng, point[1]=lat
+                        geometry_points = [{'lat': point[1], 'lng': point[0]} for point in geometry]
+                        
+                        route_segment = {
+                            'from_poi': first_poi,
+                            'to_poi': last_poi,
+                            'geometry': geometry_points,
+                            'distance_km': route.get('distance_km', 0),
+                            'duration_minutes': route.get('duration_min', 0),
+                            'instructions': [step.get('instruction', '') for step in route.get('steps', [])]
+                        }
+                        route_segments.append(route_segment)
+                    
+                    # Store structured route data
+                    data["route_structured"] = {
+                        'segments': route_segments,
+                        'total_distance_km': route.get('distance_km', 0),
+                        'total_duration_minutes': route.get('duration_min', 0)
+                    }
         
         return data
     
@@ -513,6 +597,9 @@ class TravelPlannerOrchestrator:
     
     def _generate_summary(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate final summary."""
+        print(f"🔍 _generate_summary debug - Keys in data: {list(data.keys())}")
+        print(f"   Has 'route_structured': {'route_structured' in data}")
+        
         itinerary = data.get("itinerary", {})
         location = travel_memory.get_state("location")
         

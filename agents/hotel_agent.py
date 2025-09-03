@@ -38,10 +38,12 @@ def find_hotels_google_places(destination: str, lat: float, lon: float) -> List[
         hotels = []
         for place in data.get('results', [])[:10]:  # Limit to top 10
             price_level = place.get('price_level', 2)  # Default to moderate
-                
+            place_id = place.get('place_id', '')
+            
+            # Get basic hotel info
             hotel = {
                 'name': place.get('name', 'Unknown Hotel'),
-                'place_id': place.get('place_id', ''),
+                'place_id': place_id,
                 'rating': place.get('rating', 0),
                 'user_ratings_total': place.get('user_ratings_total', 0),
                 'price_level': price_level,
@@ -52,6 +54,15 @@ def find_hotels_google_places(destination: str, lat: float, lon: float) -> List[
                 'photos': place.get('photos', []),
                 'source': 'google_places'
             }
+            
+            # Enrich with detailed information if place_id is available
+            if place_id:
+                print(f"   📝 Enriching details for: {hotel['name']}")
+                details = get_hotel_details_google_places(place_id)
+                if details and not details.get('error'):
+                    hotel.update(details)
+                    print(f"   ✅ Added details: address, phone, reviews")
+            
             hotels.append(hotel)
         
         return hotels
@@ -64,7 +75,7 @@ def get_hotel_details_google_places(place_id: str) -> Dict:
     """Get detailed hotel information from Google Places"""
     api_key = os.getenv('GOOGLE_MAPS_API_KEY')
     if not api_key:
-        return {}
+        return {'error': 'No Google Maps API key'}
     
     url = "https://maps.googleapis.com/maps/api/place/details/json"
     params = {
@@ -78,6 +89,9 @@ def get_hotel_details_google_places(place_id: str) -> Dict:
         response.raise_for_status()
         data = response.json()
         
+        if data.get('status') != 'OK':
+            return {'error': f"Google Places API error: {data.get('status')}"}
+        
         result = data.get('result', {})
         return {
             'address': result.get('formatted_address', ''),
@@ -89,8 +103,117 @@ def get_hotel_details_google_places(place_id: str) -> Dict:
         }
         
     except Exception as e:
-        print(f"⚠️ Failed to get hotel details: {e}")
-        return {}
+        return {'error': f"Failed to get hotel details: {str(e)}"}
+
+def enhance_hotel_with_llm(hotel: Dict, destination: str) -> Dict:
+    """Use LLM to enhance hotel information with structured data"""
+    try:
+        model = configure_gemini()
+        
+        hotel_name = hotel.get('name', 'Unknown Hotel')
+        vicinity = hotel.get('vicinity', destination)
+        rating = hotel.get('rating', 0)
+        
+        # Check if we need LLM enhancement (missing key details)
+        needs_enhancement = (
+            not hotel.get('address') or 
+            not hotel.get('amenities') or 
+            len(hotel.get('reviews', [])) == 0
+        )
+        
+        if not needs_enhancement:
+            return hotel  # Already has good data
+        
+        prompt = f"""Provide structured information about this hotel: {hotel_name} in {vicinity}.
+
+        Current known info:
+        - Rating: {rating}/5
+        - Location: {vicinity}
+        
+        Please provide in this exact format:
+        ADDRESS: [full address if available]
+        AMENITIES: [list key amenities like WiFi, Pool, Restaurant, Gym, etc.]
+        DESCRIPTION: [2-3 sentence description]
+        NEIGHBORHOOD: [area/district name]
+        WHY_VISIT: [why tourists would choose this hotel]
+        
+        If information is not available, write "Not available" for that field."""
+        
+        response = model.generate_content(prompt)
+        enhanced_data = parse_llm_hotel_enhancement(response.text)
+        
+        # Merge LLM data with existing hotel data
+        enhanced_hotel = hotel.copy()
+        if enhanced_data.get('address') and enhanced_data['address'] != 'Not available':
+            enhanced_hotel['llm_address'] = enhanced_data['address']
+        
+        if enhanced_data.get('amenities'):
+            enhanced_hotel['amenities'] = enhanced_data['amenities']
+            
+        if enhanced_data.get('description'):
+            enhanced_hotel['llm_description'] = enhanced_data['description']
+            
+        if enhanced_data.get('neighborhood'):
+            enhanced_hotel['neighborhood'] = enhanced_data['neighborhood']
+            
+        if enhanced_data.get('why_visit'):
+            enhanced_hotel['why_visit'] = enhanced_data['why_visit']
+        
+        enhanced_hotel['llm_enhanced'] = True
+        return enhanced_hotel
+        
+    except Exception as e:
+        print(f"⚠️ LLM hotel enhancement failed: {e}")
+        return hotel  # Return original if LLM fails
+
+def parse_llm_hotel_enhancement(response_text: str) -> Dict:
+    """Parse structured LLM response for hotel enhancement"""
+    enhancement = {}
+    lines = response_text.split('\n')
+    
+    current_field = None
+    current_content = []
+    
+    for line in lines:
+        line = line.strip()
+        if line.startswith('ADDRESS:'):
+            if current_field and current_content:
+                enhancement[current_field] = ' '.join(current_content).strip()
+            current_field = 'address'
+            current_content = [line.replace('ADDRESS:', '').strip()]
+        elif line.startswith('AMENITIES:'):
+            if current_field and current_content:
+                enhancement[current_field] = ' '.join(current_content).strip()
+            current_field = 'amenities'
+            amenities_text = line.replace('AMENITIES:', '').strip()
+            # Parse amenities into list
+            amenities = [a.strip() for a in amenities_text.split(',') if a.strip()]
+            enhancement['amenities'] = amenities
+            current_field = None
+            current_content = []
+        elif line.startswith('DESCRIPTION:'):
+            if current_field and current_content:
+                enhancement[current_field] = ' '.join(current_content).strip()
+            current_field = 'description'
+            current_content = [line.replace('DESCRIPTION:', '').strip()]
+        elif line.startswith('NEIGHBORHOOD:'):
+            if current_field and current_content:
+                enhancement[current_field] = ' '.join(current_content).strip()
+            current_field = 'neighborhood'
+            current_content = [line.replace('NEIGHBORHOOD:', '').strip()]
+        elif line.startswith('WHY_VISIT:'):
+            if current_field and current_content:
+                enhancement[current_field] = ' '.join(current_content).strip()
+            current_field = 'why_visit'
+            current_content = [line.replace('WHY_VISIT:', '').strip()]
+        elif line and current_field:
+            current_content.append(line)
+    
+    # Don't forget the last field
+    if current_field and current_content:
+        enhancement[current_field] = ' '.join(current_content).strip()
+    
+    return enhancement
 
 def find_hotels_with_llm(destination: str, vacation_type: str = "mixed") -> List[Dict]:
     """Find hotels using LLM with web search"""
@@ -255,20 +378,35 @@ def extract_neighborhood(text: str) -> str:
 
 def suggest_hotels(destination: str, lat: float, lon: float, vacation_type: str = "mixed") -> List[Dict]:
     """Main function to suggest hotels combining Google Places and LLM"""
+    
+    print(f"\n🏨 Finding hotel recommendations for {destination}...")
+    print(f"   🎯 Vacation type: {vacation_type}")
         
     all_hotels = []
     
-    # Try Google Places first
+    # Try Google Places first (primary source)
     google_hotels = find_hotels_google_places(destination, lat, lon)
     if google_hotels:
         print(f"   📍 Found {len(google_hotels)} hotels via Google Places")
-        all_hotels.extend(google_hotels)
+        
+        # Enhance Google Places hotels with LLM if they lack details
+        enhanced_hotels = []
+        for hotel in google_hotels:
+            enhanced_hotel = enhance_hotel_with_llm(hotel, destination)
+            enhanced_hotels.append(enhanced_hotel)
+        
+        all_hotels.extend(enhanced_hotels)
+        enhanced_count = len([h for h in enhanced_hotels if h.get('llm_enhanced')])
+        if enhanced_count > 0:
+            print(f"   🤖 Enhanced {enhanced_count} hotels with LLM")
     
-    # Get LLM recommendations
-    llm_hotels = find_hotels_with_llm(destination, vacation_type)
-    if llm_hotels:
-        print(f"   🤖 Found {len(llm_hotels)} hotels via LLM")
-        all_hotels.extend(llm_hotels)
+    # If we don't have enough hotels, use LLM as fallback
+    if len(all_hotels) < 5:
+        print(f"   🔄 Need more hotels, using LLM fallback...")
+        llm_hotels = find_hotels_with_llm(destination, vacation_type)
+        if llm_hotels:
+            print(f"   🤖 Found {len(llm_hotels)} additional hotels via LLM")
+            all_hotels.extend(llm_hotels)
     
     if not all_hotels:
         print("   ❌ No hotels found")
@@ -278,7 +416,8 @@ def suggest_hotels(destination: str, lat: float, lon: float, vacation_type: str 
     unique_hotels = remove_duplicate_hotels(all_hotels)
     ranked_hotels = rank_hotels(unique_hotels)
     
-    return ranked_hotels[:8]  
+    print(f"   ✅ Final recommendations: {len(ranked_hotels[:8])} hotels")
+    return ranked_hotels[:8]  # Return top 8 hotels  
 
 def remove_duplicate_hotels(hotels: List[Dict]) -> List[Dict]:
     """Remove duplicate hotels based on name similarity"""
@@ -343,17 +482,36 @@ def display_hotel_recommendations(hotels: List[Dict]):
             stars = "⭐" * int(rating)
             print(f"   {stars} {rating}/5 ({review_count} reviews)")
         
-        # Location
+        # Location and Address
         location = hotel.get('vicinity') or hotel.get('neighborhood', 'Central area')
         print(f"   📍 Location: {location}")
+        
+        # Show detailed address if available
+        if hotel.get('address'):
+            print(f"   🏠 Address: {hotel['address']}")
+        elif hotel.get('llm_address'):
+            print(f"   🏠 Address: {hotel['llm_address']} (LLM)")
+        
+        # Contact information
+        if hotel.get('phone'):
+            print(f"   📞 Phone: {hotel['phone']}")
+        if hotel.get('website'):
+            print(f"   🌐 Website: {hotel['website']}")
         
         # Amenities
         amenities = hotel.get('amenities', [])
         if amenities:
             print(f"   🎯 Amenities: {', '.join(amenities[:4])}")
         
-        # Description (for LLM hotels)
-        if hotel.get('source') == 'llm_generated' and hotel.get('description'):
+        # Enhanced LLM description or reviews
+        if hotel.get('llm_description'):
+            print(f"   📝 {hotel['llm_description'][:100]}...")
+        elif hotel.get('reviews') and len(hotel['reviews']) > 0:
+            # Show first review snippet
+            review = hotel['reviews'][0]
+            review_text = review.get('text', '')[:80]
+            print(f"   💬 Review: \"{review_text}...\" - {review.get('author', 'Guest')}")
+        elif hotel.get('source') == 'llm_generated' and hotel.get('description'):
             desc_lines = hotel['description'].split('\n')
             # Find the most descriptive line
             for line in desc_lines:
@@ -362,7 +520,12 @@ def display_hotel_recommendations(hotels: List[Dict]):
                     print(f"   📝 {line[:100]}...")
                     break
         
-        # Source
+        # Why visit (from LLM enhancement)
+        if hotel.get('why_visit'):
+            print(f"   ⭐ Why choose: {hotel['why_visit'][:80]}...")
+        
+        # Source and enhancement info
         source_emoji = "📍" if hotel.get('source') == 'google_places' else "🤖"
         source_name = "Google Places" if hotel.get('source') == 'google_places' else "LLM Research"
-        print(f"   {source_emoji} Source: {source_name}")
+        enhancement_note = " + LLM Enhanced" if hotel.get('llm_enhanced') else ""
+        print(f"   {source_emoji} Source: {source_name}{enhancement_note}")

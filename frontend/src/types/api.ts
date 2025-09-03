@@ -25,13 +25,9 @@ export interface PointOfInterest {
 
 export interface Hotel {
   name: string;
-  price?: string;
   rating?: number;
-  description?: string;
-  price_range?: string;
-  address?: string;
+  website?: string;
   amenities?: string[];
-  booking_url?: string;
 }
 
 export interface ItineraryDay {
@@ -58,6 +54,21 @@ export interface TravelPlanSummary {
   travel_tips?: string[];
 }
 
+export interface RouteSegment {
+  from_poi: string;
+  to_poi: string;
+  geometry: Array<{ lat: number; lng: number }>;
+  distance_km: number;
+  duration_minutes: number;
+  instructions?: string[];
+}
+
+export interface Route {
+  segments: RouteSegment[];
+  total_distance_km: number;
+  total_duration_minutes: number;
+}
+
 export interface TravelPlan {
   destination: string;
   start_date: string;
@@ -66,6 +77,7 @@ export interface TravelPlan {
   points_of_interest: PointOfInterest[];
   hotels: Hotel[];
   itinerary: ItineraryDay[];
+  routes?: Route;
   generation_timestamp: string;
   file_paths: Record<string, string>;
   

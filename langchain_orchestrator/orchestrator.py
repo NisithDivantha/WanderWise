@@ -408,14 +408,55 @@ class TravelPlannerOrchestrator:
         return data
     
     def _generate_descriptions(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate descriptions for POIs."""
+        """Generate descriptions for POIs that don't already have them."""
         pois = data["pois"]
         
-        if pois:
-            enriched_pois = self.tools["description_generation_tool"].run({"pois": pois})
-            travel_memory.update_state("pois", enriched_pois, "description_agent")
-            message_bus.publish("descriptions_generated", {"count": len(enriched_pois)}, "description_agent")
-            data["pois"] = enriched_pois
+        if not pois:
+            return data
+        
+        # Separate POIs that need descriptions from those that already have them
+        pois_needing_descriptions = []
+        pois_with_descriptions = []
+        
+        for poi in pois:
+            # Check if POI already has a description from LLM
+            llm_data = poi.get('llm_data', {})
+            has_description = (
+                poi.get('description') or 
+                llm_data.get('description') or
+                poi.get('comprehensive_data')
+            )
+            
+            if has_description:
+                pois_with_descriptions.append(poi)
+                print(f"   ✅ {poi.get('name', 'Unknown')} already has description")
+            else:
+                pois_needing_descriptions.append(poi)
+                print(f"   📝 {poi.get('name', 'Unknown')} needs description")
+        
+        # Only run description generation for POIs that need it
+        if pois_needing_descriptions:
+            print(f"   🔍 Generating descriptions for {len(pois_needing_descriptions)} POIs...")
+            enriched_pois = self.tools["description_generation_tool"].run({"pois": pois_needing_descriptions})
+            
+            # Combine POIs with existing descriptions and newly enriched ones
+            all_pois = pois_with_descriptions + enriched_pois
+            
+            travel_memory.update_state("pois", all_pois, "description_agent")
+            message_bus.publish("descriptions_generated", {
+                "total_count": len(all_pois),
+                "enriched_count": len(enriched_pois),
+                "skipped_count": len(pois_with_descriptions)
+            }, "description_agent")
+            data["pois"] = all_pois
+        else:
+            print(f"   ✅ All {len(pois)} POIs already have descriptions - skipping generation")
+            travel_memory.update_state("pois", pois, "description_agent")
+            message_bus.publish("descriptions_generated", {
+                "total_count": len(pois),
+                "enriched_count": 0,
+                "skipped_count": len(pois)
+            }, "description_agent")
         
         return data
     

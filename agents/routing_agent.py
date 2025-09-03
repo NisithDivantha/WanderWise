@@ -13,10 +13,7 @@ def get_route(coords: list, mode: str = "foot-walking"):
     """
     Calculates route through all coordinates in the given order.
     """
-    print(f"\n🗺️ ROUTING AGENT DEBUG:")
-    print(f"   📍 Input coords: {coords}")
-    print(f"   🚶 Mode: {mode}")
-    
+
     # Validate input
     if len(coords) < 2:
         error_msg = "Need at least 2 coordinates for routing"
@@ -35,9 +32,7 @@ def get_route(coords: list, mode: str = "foot-walking"):
     }
 
     url = f"https://api.openrouteservice.org/v2/directions/{mode}"
-    print(f"   🌐 API URL: {url}")
-    print(f"   📤 Request body: {body}")
-    
+
     try:
         response = requests.post(url, headers=headers, json=body)
         print(f"   📊 Response status: {response.status_code}")
@@ -75,12 +70,7 @@ def get_route(coords: list, mode: str = "foot-walking"):
             "geometry": convert.decode_polyline(route.get('geometry', ''))['coordinates']  # list of [lat, lon]
         }
         
-        print(f"   ✅ FINAL RESULT:")
-        print(f"      📏 Distance: {result['distance_km']:.2f} km")
-        print(f"      ⏱️ Duration: {result['duration_min']:.1f} minutes")
-        print(f"      🚶 Steps: {len(result['steps'])}")
-        print(f"      🗺️ Geometry points: {len(result['geometry'])}")
-        
+
         return result
         
     except requests.exceptions.RequestException as e:

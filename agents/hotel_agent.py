@@ -17,14 +17,14 @@ def find_hotels_google_places(destination: str, lat: float, lon: float) -> List[
     """Find hotels using Google Places API"""
     api_key = os.getenv('GOOGLE_MAPS_API_KEY')
     if not api_key:
-        print("⚠️ Google Maps API key not found, using LLM-only hotel search")
+        print(" Google Maps API key not found, using LLM-only hotel search")
         return []
     
     # Search for hotels nearby
     url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
     params = {
         'location': f"{lat},{lon}",
-        'radius': 5000,  # 5km radius
+        'radius': 10000,  # 10km radius
         'type': 'lodging',
         'key': api_key,
         'rankby': 'prominence'
@@ -253,8 +253,7 @@ def extract_neighborhood(text: str) -> str:
     
     return "Central area"
 
-def suggest_hotels(destination: str, lat: float, lon: float, vacation_type: str = "mixed", 
-                   budget: str = None) -> List[Dict]:
+def suggest_hotels(destination: str, lat: float, lon: float, vacation_type: str = "mixed") -> List[Dict]:
     """Main function to suggest hotels combining Google Places and LLM"""
         
     all_hotels = []
@@ -279,7 +278,7 @@ def suggest_hotels(destination: str, lat: float, lon: float, vacation_type: str 
     unique_hotels = remove_duplicate_hotels(all_hotels)
     ranked_hotels = rank_hotels(unique_hotels)
     
-    return ranked_hotels[:8]  # Return top 8 hotels
+    return ranked_hotels[:8]  
 
 def remove_duplicate_hotels(hotels: List[Dict]) -> List[Dict]:
     """Remove duplicate hotels based on name similarity"""

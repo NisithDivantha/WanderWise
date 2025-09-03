@@ -579,9 +579,6 @@ class TravelPlannerOrchestrator:
             if user_prefs.get("budget"):
                 itinerary_params["budget"] = user_prefs["budget"]
                 
-            if user_prefs.get("group_size"):
-                itinerary_params["group_size"] = user_prefs["group_size"]
-                
             if user_prefs.get("start_date"):
                 itinerary_params["start_date"] = user_prefs["start_date"]
                 
@@ -597,8 +594,7 @@ class TravelPlannerOrchestrator:
     
     def _generate_summary(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate final summary."""
-        print(f"🔍 _generate_summary debug - Keys in data: {list(data.keys())}")
-        print(f"   Has 'route_structured': {'route_structured' in data}")
+
         
         itinerary = data.get("itinerary", {})
         location = travel_memory.get_state("location")

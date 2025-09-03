@@ -13,23 +13,12 @@ def configure_gemini():
     genai.configure(api_key=api_key)
     return genai.GenerativeModel('gemini-1.5-flash')
 
-def find_hotels_google_places(destination: str, lat: float, lon: float, budget: float = 100.0) -> List[Dict]:
+def find_hotels_google_places(destination: str, lat: float, lon: float) -> List[Dict]:
     """Find hotels using Google Places API"""
     api_key = os.getenv('GOOGLE_MAPS_API_KEY')
     if not api_key:
         print("⚠️ Google Maps API key not found, using LLM-only hotel search")
         return []
-    
-    # Determine price level based on budget
-    # Google Places uses 0-4 scale: 0=Free, 1=Inexpensive, 2=Moderate, 3=Expensive, 4=Very Expensive
-    if budget < 50:
-        max_price_level = 1
-    elif budget < 100:
-        max_price_level = 2
-    elif budget < 200:
-        max_price_level = 3
-    else:
-        max_price_level = 4
     
     # Search for hotels nearby
     url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
@@ -48,10 +37,7 @@ def find_hotels_google_places(destination: str, lat: float, lon: float, budget: 
         
         hotels = []
         for place in data.get('results', [])[:10]:  # Limit to top 10
-            # Filter by price level if available
             price_level = place.get('price_level', 2)  # Default to moderate
-            if price_level > max_price_level:
-                continue
                 
             hotel = {
                 'name': place.get('name', 'Unknown Hotel'),
@@ -106,20 +92,10 @@ def get_hotel_details_google_places(place_id: str) -> Dict:
         print(f"⚠️ Failed to get hotel details: {e}")
         return {}
 
-def find_hotels_with_llm(destination: str, vacation_type: str = "mixed", budget: float = 100.0) -> List[Dict]:
+def find_hotels_with_llm(destination: str, vacation_type: str = "mixed") -> List[Dict]:
     """Find hotels using LLM with web search"""
     try:
         model = configure_gemini()
-        
-        # Create budget category
-        if budget < 50:
-            budget_category = "budget/backpacker"
-        elif budget < 100:
-            budget_category = "mid-range"
-        elif budget < 200:
-            budget_category = "upscale"
-        else:
-            budget_category = "luxury"
         
         # Adjust hotel type based on vacation preferences
         hotel_type_preferences = {
@@ -133,19 +109,17 @@ def find_hotels_with_llm(destination: str, vacation_type: str = "mixed", budget:
         hotel_preference = hotel_type_preferences.get(vacation_type, hotel_type_preferences["mixed"])
         
         prompt = f"""Find 5-7 highly recommended hotels in {destination} that match these criteria:
-        - Budget category: {budget_category} (around ${budget} per night)
         - Style preference: {hotel_preference}
         - Good reviews and ratings
         - Good location for tourists
 
         For each hotel, provide:
         1. Name
-        2. Approximate price per night
-        3. Rating (if available)
-        4. Brief description (2-3 sentences)
-        5. Key amenities
-        6. Neighborhood/area
-        7. Why it's good for this type of vacation
+        2. Rating (if available)
+        3. Brief description (2-3 sentences)
+        4. Key amenities
+        5. Neighborhood/area
+        6. Why it's good for this type of vacation
 
         Format as a structured list with clear separation between hotels."""
         
@@ -194,7 +168,6 @@ def parse_llm_hotel_response(response_text: str, destination: str) -> List[Dict]
         hotel = {
             'name': extract_hotel_name(section),
             'description': section,
-            'price_estimate': extract_price(section),
             'rating': extract_rating(section),
             'amenities': extract_amenities(section),
             'neighborhood': extract_neighborhood(section),
@@ -225,23 +198,6 @@ def extract_hotel_name(text: str) -> str:
             return line
     
     return "Unknown Hotel"
-
-def extract_price(text: str) -> str:
-    """Extract price information from hotel description"""
-    import re
-    price_patterns = [
-        r'\$(\d+)-?\$?(\d+)?',
-        r'(\d+)-?(\d+)?\s*dollars?',
-        r'around\s*\$(\d+)',
-        r'from\s*\$(\d+)'
-    ]
-    
-    for pattern in price_patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            return match.group(0)
-    
-    return "Price not specified"
 
 def extract_rating(text: str) -> float:
     """Extract rating from hotel description"""
@@ -297,22 +253,20 @@ def extract_neighborhood(text: str) -> str:
     
     return "Central area"
 
-def suggest_hotels(destination: str, lat: float, lon: float, vacation_type: str = "mixed", budget: float = 100.0) -> List[Dict]:
+def suggest_hotels(destination: str, lat: float, lon: float, vacation_type: str = "mixed", 
+                   budget: str = None) -> List[Dict]:
     """Main function to suggest hotels combining Google Places and LLM"""
-    print(f"\n🏨 Finding hotel recommendations for {destination}...")
-    print(f"   💰 Budget: ${budget} per night")
-    print(f"   🎯 Vacation type: {vacation_type}")
-    
+        
     all_hotels = []
     
     # Try Google Places first
-    google_hotels = find_hotels_google_places(destination, lat, lon, budget)
+    google_hotels = find_hotels_google_places(destination, lat, lon)
     if google_hotels:
         print(f"   📍 Found {len(google_hotels)} hotels via Google Places")
         all_hotels.extend(google_hotels)
     
     # Get LLM recommendations
-    llm_hotels = find_hotels_with_llm(destination, vacation_type, budget)
+    llm_hotels = find_hotels_with_llm(destination, vacation_type)
     if llm_hotels:
         print(f"   🤖 Found {len(llm_hotels)} hotels via LLM")
         all_hotels.extend(llm_hotels)
@@ -389,15 +343,6 @@ def display_hotel_recommendations(hotels: List[Dict]):
             review_count = hotel.get('user_ratings_total', 0)
             stars = "⭐" * int(rating)
             print(f"   {stars} {rating}/5 ({review_count} reviews)")
-        
-        # Price information
-        if hotel.get('source') == 'google_places':
-            price_level = hotel.get('price_level', 0)
-            price_symbols = ['Free', '$', '$$', '$$$', '$$$$']
-            if price_level < len(price_symbols):
-                print(f"   💰 Price level: {price_symbols[price_level]}")
-        elif hotel.get('price_estimate'):
-            print(f"   💰 Price: {hotel['price_estimate']}")
         
         # Location
         location = hotel.get('vicinity') or hotel.get('neighborhood', 'Central area')

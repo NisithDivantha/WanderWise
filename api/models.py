@@ -33,9 +33,8 @@ class PointOfInterest(BaseModel):
 class Hotel(BaseModel):
     """Model for a hotel."""
     name: str
-    price: Optional[str] = None
     rating: Optional[float] = None
-    description: Optional[str] = None
+    website: Optional[str] = None
 
 
 class ItineraryActivity(BaseModel):
@@ -51,6 +50,23 @@ class ItineraryDay(BaseModel):
     activities: List[ItineraryActivity]
 
 
+class RouteSegment(BaseModel):
+    """Model for a route segment between two POIs."""
+    from_poi: str  # Name of starting POI
+    to_poi: str    # Name of ending POI
+    geometry: List[Dict[str, float]]  # List of [lat, lng] coordinate pairs
+    distance_km: float
+    duration_minutes: float
+    instructions: Optional[List[str]] = None
+
+
+class Route(BaseModel):
+    """Model for a complete route with multiple segments."""
+    segments: List[RouteSegment]
+    total_distance_km: float
+    total_duration_minutes: float
+
+
 class TravelPlanResponse(BaseModel):
     """Response model for travel plan generation."""
     destination: str
@@ -60,6 +76,7 @@ class TravelPlanResponse(BaseModel):
     points_of_interest: List[PointOfInterest]
     hotels: List[Hotel]
     itinerary: List[ItineraryDay]
+    routes: Optional[Route] = None
     generation_timestamp: datetime
     file_paths: Dict[str, str]  # Contains paths to generated files
 

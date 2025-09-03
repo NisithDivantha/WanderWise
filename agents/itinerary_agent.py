@@ -13,7 +13,9 @@ def get_llm_model():
         return genai.GenerativeModel('gemini-1.5-flash')
     return None
 
-def generate_smart_itinerary_with_llm(pois, hotels, duration, interests="general tourism", budget_range="moderate"):
+def generate_smart_itinerary_with_llm(pois, hotels, duration, interests="general tourism", 
+                                     budget_range="moderate", group_size=None, start_date=None, end_date=None,
+                                     travel_style=None, accommodation=None, transportation=None, special_requirements=None):
     """Generate intelligent day-by-day itinerary using LLM."""
     model = get_llm_model()
     
@@ -44,6 +46,30 @@ def generate_smart_itinerary_with_llm(pois, hotels, duration, interests="general
         hotel_data.append(hotel_info)
     
     # Create comprehensive prompt
+    # Build additional context from new parameters
+    style_context = ""
+    if travel_style == "relaxed":
+        style_context = "- Style: Relaxed pace with plenty of downtime, longer meal breaks, and flexible timing"
+    elif travel_style == "moderate":
+        style_context = "- Style: Balanced mix of activities and rest, moderate walking distances"
+    elif travel_style == "packed":
+        style_context = "- Style: Action-packed schedule with maximum attractions, minimal downtime"
+    
+    group_context = f"- Group: {group_size} people" if group_size else ""
+    
+    accommodation_context = ""
+    if accommodation:
+        accommodation_context = f"- Accommodation preference: {accommodation}"
+    
+    transportation_context = ""
+    if transportation:
+        transport_modes = ", ".join(transportation)
+        transportation_context = f"- Preferred transportation: {transport_modes}"
+    
+    special_context = ""
+    if special_requirements:
+        special_context = f"- Special requirements: {special_requirements}"
+
     prompt = f"""
 You are an expert travel planner. Create a detailed {duration}-day itinerary with the following requirements:
 
@@ -51,6 +77,11 @@ You are an expert travel planner. Create a detailed {duration}-day itinerary wit
 - Duration: {duration} days
 - Interests: {interests}
 - Budget: {budget_range}
+{style_context}
+{group_context}
+{accommodation_context}
+{transportation_context}
+{special_context}
 
 **Available POIs ({len(poi_data)}):**
 {json.dumps(poi_data, indent=2)}

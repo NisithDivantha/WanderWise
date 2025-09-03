@@ -13,6 +13,7 @@ const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapCo
 const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false })
 const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false })
 const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false })
+const Polyline = dynamic(() => import('react-leaflet').then(mod => mod.Polyline), { ssr: false })
 
 interface TravelMapProps {
   plan: TravelPlan
@@ -22,6 +23,13 @@ interface TravelMapProps {
 
 export function TravelMap({ plan, className = '', height = '400px' }: TravelMapProps) {
   const mapRef = useRef<any>(null)
+
+  // Debug: Log route data
+  console.log('🗺️ TravelMap received plan:', {
+    hasRoutes: !!plan.routes,
+    routeSegments: plan.routes?.segments?.length || 0,
+    routeData: plan.routes
+  })
 
   // Get all coordinates from POIs and hotels
   const getAllCoordinates = () => {
@@ -137,6 +145,39 @@ export function TravelMap({ plan, className = '', height = '400px' }: TravelMapP
             </Popup>
           </Marker>
         ))}
+        
+        {/* Render route polylines */}
+        {plan.routes?.segments?.map((segment, index) => {
+          console.log(`🛣️ Rendering route segment ${index}:`, {
+            fromPoi: segment.from_poi,
+            toPoi: segment.to_poi,
+            geometryPoints: segment.geometry.length,
+            samplePoint: segment.geometry[0]
+          })
+          
+          return (
+            <Polyline
+              key={`route-${index}`}
+              positions={segment.geometry.map(point => [point.lat, point.lng])}
+              pathOptions={{
+                color: '#3B82F6',
+                weight: 4,
+                opacity: 0.7,
+                dashArray: '0'
+              }}
+            >
+              <Popup>
+                <div className="text-sm">
+                  <div className="font-medium">Route: {segment.from_poi} → {segment.to_poi}</div>
+                  <div className="text-gray-600">
+                    Distance: {segment.distance_km.toFixed(1)} km<br/>
+                    Duration: {Math.round(segment.duration_minutes)} minutes
+                  </div>
+                </div>
+              </Popup>
+            </Polyline>
+          )
+        })}
       </MapContainer>
     </div>
   )

@@ -375,16 +375,24 @@ function HotelsTab({ plan }: { plan: TravelPlan }) {
                   <Star className="w-4 h-4 fill-current" />
                   <span className="text-sm font-medium text-gray-600">{hotel.rating}</span>
                 </div>
-                <Badge variant="outline">{hotel.price_range || hotel.price || 'Price varies'}</Badge>
               </div>
             </CardTitle>
-            <CardDescription className="flex items-center gap-1">
-              <MapPin className="w-4 h-4" />
-              {hotel.address || 'Address not available'}
-            </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600 mb-4">{hotel.description}</p>
+            {/* Website Link */}
+            {hotel.website && (
+              <div className="mb-4">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-2"
+                  onClick={() => hotel.website && window.open(hotel.website, '_blank')}
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Visit Website
+                </Button>
+              </div>
+            )}
             
             {/* Amenities */}
             {hotel.amenities && hotel.amenities.length > 0 && (
@@ -403,19 +411,6 @@ function HotelsTab({ plan }: { plan: TravelPlan }) {
                   )}
                 </div>
               </div>
-            )}
-
-            {/* Booking Link */}
-            {hotel.booking_url && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="flex items-center gap-2"
-                onClick={() => hotel.booking_url && window.open(hotel.booking_url, '_blank')}
-              >
-                <ExternalLink className="w-4 h-4" />
-                View Details & Book
-              </Button>
             )}
           </CardContent>
         </Card>

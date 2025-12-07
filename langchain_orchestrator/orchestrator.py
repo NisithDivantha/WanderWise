@@ -264,7 +264,7 @@ class TravelPlannerOrchestrator:
         
         # Handle error cases
         if isinstance(coords, dict) and "error" in coords:
-            print(f"⚠️ Skipping POI fetch due to geocoding error: {coords['error']}")
+            print(f"Skipping POI fetch due to geocoding error: {coords['error']}")
             return []
         
         # Handle different coordinate formats
@@ -272,15 +272,15 @@ class TravelPlannerOrchestrator:
             lat = coords.get("latitude") or coords.get("lat")
             lng = coords.get("longitude") or coords.get("lng") or coords.get("lon")
         else:
-            print(f"⚠️ Invalid coordinates format: {coords}")
+            print(f"Invalid coordinates format: {coords}")
             return []
         
         if not lat or not lng:
-            print(f"⚠️ Missing latitude/longitude in coordinates: {coords}")
+            print(f"Missing latitude/longitude in coordinates: {coords}")
             return []
         
         # Try LLM POI fetcher first
-        print(f"🤖 Attempting LLM-based POI discovery for {location}...")
+        print(f"Attempting LLM-based POI discovery for {location}...")
         try:
             llm_result = self.tools["llm_poi_fetching_tool"].run({
                 "location": location,
@@ -291,19 +291,19 @@ class TravelPlannerOrchestrator:
             if llm_result and isinstance(llm_result, list) and len(llm_result) > 0:
                 # Check if result contains error
                 if not (len(llm_result) == 1 and isinstance(llm_result[0], dict) and "error" in llm_result[0]):
-                    print(f"✅ LLM POI discovery successful: {len(llm_result)} POIs found")
+                    print(f"LLM POI discovery successful: {len(llm_result)} POIs found")
                     message_bus.publish("pois_fetched", {"count": len(llm_result), "source": "llm"}, "poi_agent")
                     return llm_result
                 else:
-                    print(f"❌ LLM POI discovery failed: {llm_result[0]['error']}")
+                    print(f"LLM POI discovery failed: {llm_result[0]['error']}")
             else:
-                print("❌ LLM POI discovery returned no valid results")
+                print("LLM POI discovery returned no valid results")
                 
         except Exception as e:
-            print(f"❌ LLM POI discovery failed with exception: {str(e)}")
+            print(f"LLM POI discovery failed with exception: {str(e)}")
         
         # Fall back to OpenTripMap API
-        print(f"📡 Falling back to OpenTripMap API for {location}...")
+        print(f"Falling back to OpenTripMap API for {location}...")
         try:
             result = self.tools["poi_fetching_tool"].run({
                 "latitude": lat,
@@ -314,31 +314,31 @@ class TravelPlannerOrchestrator:
             if result and isinstance(result, list) and len(result) > 0:
                 # Check if result contains error
                 if not (len(result) == 1 and isinstance(result[0], dict) and "error" in result[0]):
-                    print(f"✅ OpenTripMap API successful: {len(result)} POIs found")
+                    print(f"OpenTripMap API successful: {len(result)} POIs found")
                     message_bus.publish("pois_fetched", {"count": len(result), "source": "opentripmap"}, "poi_agent")
                     return result
                 else:
-                    print(f"❌ OpenTripMap API failed: {result[0]['error']}")
+                    print(f"OpenTripMap API failed: {result[0]['error']}")
             else:
-                print("❌ OpenTripMap API returned no valid results")
+                print("OpenTripMap API returned no valid results")
                 
         except Exception as e:
-            print(f"❌ OpenTripMap API failed with exception: {str(e)}")
+            print(f"OpenTripMap API failed with exception: {str(e)}")
         
         # If both methods fail, return empty list
-        print("❌ Both LLM and OpenTripMap POI fetching failed")
+        print("Both LLM and OpenTripMap POI fetching failed")
         message_bus.publish("pois_fetched", {"count": 0, "source": "failed"}, "poi_agent")
         return []
     
     def _fetch_hotels(self, inputs: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Fetch hotels."""
-        print(f"🏨 _fetch_hotels called with inputs keys: {list(inputs.keys())}")
+        print(f"_fetch_hotels called with inputs keys: {list(inputs.keys())}")
         coords = inputs["coordinates"]
-        print(f"🏨 Coordinates received: {coords}")
+        print(f"Coordinates received: {coords}")
         
         # Handle error cases
         if isinstance(coords, dict) and "error" in coords:
-            print(f"🏨 Skipping hotel fetch due to geocoding error: {coords['error']}")
+            print(f"Skipping hotel fetch due to geocoding error: {coords['error']}")
             return []
         
         # Handle different coordinate formats
@@ -346,14 +346,14 @@ class TravelPlannerOrchestrator:
             lat = coords.get("latitude") or coords.get("lat")
             lng = coords.get("longitude") or coords.get("lng") or coords.get("lon")
         else:
-            print(f"🏨 Invalid coordinates format: {coords}")
+            print(f"Invalid coordinates format: {coords}")
             return []
         
         if not lat or not lng:
-            print(f"🏨 Missing latitude/longitude in coordinates: {coords}")
+            print(f"Missing latitude/longitude in coordinates: {coords}")
             return []
         
-        print(f"🏨 Using coordinates: lat={lat}, lng={lng}, location={inputs['location']}")
+        print(f"Using coordinates: lat={lat}, lng={lng}, location={inputs['location']}")
         
         # Prepare hotel search parameters
         hotel_params = {
@@ -366,23 +366,23 @@ class TravelPlannerOrchestrator:
         if inputs.get("budget"):
             hotel_params["budget"] = inputs["budget"]
         
-        print(f"🏨 Hotel params: {hotel_params}")
+        print(f"Hotel params: {hotel_params}")
         
         try:
             result = self.tools["hotel_fetching_tool"].run(hotel_params)
-            print(f"🏨 Hotel tool returned: {len(result) if result else 0} results")
+            print(f"Hotel tool returned: {len(result) if result else 0} results")
             
             message_bus.publish("hotels_fetched", {"count": len(result)}, "hotel_agent")
             return result
         except Exception as e:
-            print(f"🏨 Hotel fetching exception: {str(e)}")
+            print(f"Hotel fetching exception: {str(e)}")
             import traceback
             traceback.print_exc()
             return []
     
     def _merge_pois(self, parallel_results: Dict[str, Any]) -> Dict[str, Any]:
         """Process POIs from the unified fetching method."""
-        print(f"🔍 _merge_pois called with parallel_results keys: {list(parallel_results.keys())}")
+        print(f"_merge_pois called with parallel_results keys: {list(parallel_results.keys())}")
         
         pois = parallel_results.get("pois", [])
         hotels = parallel_results.get("hotels", [])
@@ -391,9 +391,9 @@ class TravelPlannerOrchestrator:
         print(f"🔍 Hotels found: {len(hotels)}")
         
         if hotels:
-            print(f"🏨 Hotel data example: {hotels[0] if hotels else 'None'}")
+            print(f"Hotel data example: {hotels[0] if hotels else 'None'}")
         else:
-            print(f"🏨 No hotels in parallel results")
+            print(f"No hotels in parallel results")
         
         # Remove duplicates based on name similarity (in case any exist)
         unique_pois = self._remove_duplicate_pois(pois)
@@ -453,14 +453,14 @@ class TravelPlannerOrchestrator:
             
             if has_description:
                 pois_with_descriptions.append(poi)
-                print(f"   ✅ {poi.get('name', 'Unknown')} already has description")
+                print(f"   {poi.get('name', 'Unknown')} already has description")
             else:
                 pois_needing_descriptions.append(poi)
-                print(f"   📝 {poi.get('name', 'Unknown')} needs description")
+                print(f"   {poi.get('name', 'Unknown')} needs description")
         
         # Only run description generation for POIs that need it
         if pois_needing_descriptions:
-            print(f"   🔍 Generating descriptions for {len(pois_needing_descriptions)} POIs...")
+            print(f"   Generating descriptions for {len(pois_needing_descriptions)} POIs...")
             enriched_pois = self.tools["description_generation_tool"].run({"pois": pois_needing_descriptions})
             
             # Combine POIs with existing descriptions and newly enriched ones
@@ -474,7 +474,7 @@ class TravelPlannerOrchestrator:
             }, "description_agent")
             data["pois"] = all_pois
         else:
-            print(f"   ✅ All {len(pois)} POIs already have descriptions - skipping generation")
+            print(f"   All {len(pois)} POIs already have descriptions - skipping generation")
             travel_memory.update_state("pois", pois, "description_agent")
             message_bus.publish("descriptions_generated", {
                 "total_count": len(pois),
@@ -491,29 +491,6 @@ class TravelPlannerOrchestrator:
         
         if pois:
             route = self.tools["route_calculation_tool"].run({"pois": pois, "hotels": hotels})
-            
-            # # Debug: Print routing result details
-            # print(f"🗺️ Routing Agent Result:")
-            # print(f"   Route type: {type(route)}")
-            # print(f"   Route keys: {route.keys() if isinstance(route, dict) else 'Not a dict'}")
-            
-            # if isinstance(route, dict):
-            #     if 'error' in route:
-            #         print(f"   ❌ Error: {route['error']}")
-            #     else:
-            #         print(f"   📏 Distance: {route.get('distance_km', 'N/A')} km")
-            #         print(f"   ⏱️ Duration: {route.get('duration_min', 'N/A')} minutes")
-            #         print(f"   🔢 Steps count: {len(route.get('steps', []))}")
-            #         print(f"   🗺️ Geometry points: {len(route.get('geometry', []))}")
-                    
-            #         # Show first few steps
-            #         steps = route.get('steps', [])
-            #         if steps:
-            #             print(f"   📍 First 3 steps:")
-            #             for i, step in enumerate(steps[:3]):
-            #                 instruction = step.get('instruction', 'No instruction')[:50]
-            #                 distance = step.get('distance', 0)
-            #                 print(f"      {i+1}. {instruction}... ({distance}m)")
             
             travel_memory.update_state("route", route, "routing_agent")
             message_bus.publish("route_calculated", route, "routing_agent")

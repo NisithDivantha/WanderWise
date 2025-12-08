@@ -59,24 +59,24 @@ def fetch_google_place_details(poi_name: str, location_context: str = "") -> Dic
                 "key": api_key  # Same GOOGLE_MAPS_API_KEY
             }
             
-            print(f"   🔍 Trying Google Places: '{search_query}'")
+            print(f"   Trying Google Places: '{search_query}'")
             search_response = requests.get(search_url, params=search_params, timeout=10)
             search_data = search_response.json()
             
             # Debug the response
             status = search_data.get("status")
-            print(f"   📡 Response status: {status}")
+            print(f"   Response status: {status}")
             
             if status == "REQUEST_DENIED":
                 error_msg = search_data.get("error_message", "Unknown error")
-                print(f"   ❌ Request denied: {error_msg}")
+                print(f"    Request denied: {error_msg}")
                 return {"error": f"Places API access denied: {error_msg}"}
             
             if status == "OK" and search_data.get("results"):
                 # Found a match!
                 place_id = search_data["results"][0]["place_id"]
                 found_name = search_data["results"][0].get("name", variant)
-                print(f"   ✅ Found match: '{found_name}'")
+                print(f"   Found match: '{found_name}'")
                 
                 # Step 2: Get detailed information including reviews
                 details_url = "https://maps.googleapis.com/maps/api/place/details/json"
@@ -86,12 +86,12 @@ def fetch_google_place_details(poi_name: str, location_context: str = "") -> Dic
                     "key": api_key  # Same GOOGLE_MAPS_API_KEY
                 }
                 
-                print(f"   📝 Fetching details for place_id: {place_id}")
+                print(f"    Fetching details for place_id: {place_id}")
                 details_response = requests.get(details_url, params=details_params, timeout=10)
                 details_data = details_response.json()
                 
                 if details_data.get("status") != "OK":
-                    print(f"   ❌ Failed to get details: {details_data.get('status')}")
+                    print(f"    Failed to get details: {details_data.get('status')}")
                     continue  # Try next variant
                 
                 result = details_data.get("result", {})
@@ -118,25 +118,25 @@ def fetch_google_place_details(poi_name: str, location_context: str = "") -> Dic
                     "search_query_used": search_query
                 }
             else:
-                print(f"   ❌ Not found with: '{search_query}' (Status: {status})")
+                print(f"    Not found with: '{search_query}' (Status: {status})")
                 time.sleep(0.5)  # Small delay between attempts
         
         # If we get here, none of the variants worked
         return {"error": f"Place not found after trying {len(search_variants)} search variants"}
         
     except Exception as e:
-        print(f"   ❌ Google Places API error: {e}")
+        print(f"    Google Places API error: {e}")
         return {"error": str(e)}
 
 def enhance_pois_with_reviews(pois: List[Dict], location_context: str = "") -> List[Dict]:
     """Enhance POIs with Google Maps reviews and ratings"""
     
-    print(f"\n⭐ Enhancing {len(pois)} POIs with Google Maps reviews...")
+    print(f"\n Enhancing {len(pois)} POIs with Google Maps reviews...")
     
     enhanced_pois = []
     
     for i, poi in enumerate(pois, 1):
-        print(f"\n🏛️ Processing {i}/{len(pois)}: {poi.get('name', 'Unknown')}")
+        print(f"\n Processing {i}/{len(pois)}: {poi.get('name', 'Unknown')}")
         
         # Fetch Google Places data
         google_data = fetch_google_place_details(poi.get('name', ''), location_context)
@@ -158,15 +158,15 @@ def enhance_pois_with_reviews(pois: List[Dict], location_context: str = "") -> L
             total = google_data.get('total_ratings', 0)
             reviews_count = len(google_data.get('reviews', []))
             
-            print(f"   ⭐ Rating: {rating:.1f}/5.0 ({total:,} reviews)")
-            print(f"   📝 Found {reviews_count} recent reviews")
+            print(f"    Rating: {rating:.1f}/5.0 ({total:,} reviews)")
+            print(f"    Found {reviews_count} recent reviews")
             
             # Show first review snippet
             if google_data.get('reviews'):
                 first_review = google_data['reviews'][0]
-                print(f"   💬 \"{first_review['text'][:100]}...\" - {first_review['author']} ({first_review['rating']}⭐)")
+                print(f"     \"{first_review['text'][:100]}...\" - {first_review['author']} ({first_review['rating']}⭐)")
         else:
-            print(f"   ❌ {google_data.get('error', 'Unknown error')}")
+            print(f"   {google_data.get('error', 'Unknown error')}")
         
         # Rate limiting for Google Places API
         time.sleep(1)
@@ -204,7 +204,7 @@ def rank_pois_by_rating(pois: List[Dict]) -> List[Dict]:
     # Sort by calculated score (highest first)
     ranked_pois = sorted(pois, key=calculate_score, reverse=True)
     
-    print(f"\n📊 POI Ranking by Google Maps Data:")
+    print(f"\nPOI Ranking by Google Maps Data:")
     print("=" * 50)
     
     for i, poi in enumerate(ranked_pois[:10], 1):  # Show top 10
@@ -213,7 +213,7 @@ def rank_pois_by_rating(pois: List[Dict]) -> List[Dict]:
         score = calculate_score(poi)
         
         print(f"{i:2d}. {poi.get('name', 'Unknown')}")
-        print(f"    ⭐ {rating:.1f}/5.0 ({total:,} reviews) | Score: {score:.1f}")
+        print(f"     {rating:.1f}/5.0 ({total:,} reviews) | Score: {score:.1f}")
     
     return ranked_pois
 
@@ -222,26 +222,26 @@ def display_poi_reviews(poi: Dict):
     google_data = poi.get('google_reviews', {})
     
     if 'error' in google_data:
-        print(f"   ❌ No Google data: {google_data['error']}")
+        print(f"    No Google data: {google_data['error']}")
         return
     
     rating = google_data.get('rating', 0)
     total = google_data.get('total_ratings', 0)
     reviews = google_data.get('reviews', [])
     
-    print(f"   ⭐ Overall Rating: {rating:.1f}/5.0 ({total:,} total reviews)")
+    print(f"    Overall Rating: {rating:.1f}/5.0 ({total:,} total reviews)")
     
     if google_data.get('price_level') is not None:
         price_symbols = ["Free", "$", "$$", "$$$", "$$$$"]
         price_level = google_data.get('price_level', 0)
-        print(f"   💰 Price Level: {price_symbols[price_level] if price_level < len(price_symbols) else 'Unknown'}")
+        print(f"    Price Level: {price_symbols[price_level] if price_level < len(price_symbols) else 'Unknown'}")
     
     if google_data.get('is_open') is not None:
-        status = "🟢 Open" if google_data.get('is_open') else "🔴 Closed"
-        print(f"   🕐 Status: {status}")
+        status = " Open" if google_data.get('is_open') else " Closed"
+        print(f"   Status: {status}")
     
     if reviews:
-        print(f"   📝 Recent Reviews:")
+        print(f"    Recent Reviews:")
         for i, review in enumerate(reviews, 1):
             print(f"      {i}. {review['rating']}⭐ by {review['author']} ({review['time']})")
             print(f"         \"{review['text']}\"")

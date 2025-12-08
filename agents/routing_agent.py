@@ -17,7 +17,7 @@ def get_route(coords: list, mode: str = "foot-walking"):
     # Validate input
     if len(coords) < 2:
         error_msg = "Need at least 2 coordinates for routing"
-        print(f"   ❌ Validation error: {error_msg}")
+        print(f"   Validation error: {error_msg}")
         raise ValueError(error_msg)
         
     headers = {
@@ -35,28 +35,28 @@ def get_route(coords: list, mode: str = "foot-walking"):
 
     try:
         response = requests.post(url, headers=headers, json=body)
-        print(f"   📊 Response status: {response.status_code}")
+        print(f"   Response status: {response.status_code}")
         response.raise_for_status()
         
         data = response.json()
-        print(f"   📥 Raw API response keys: {data.keys()}")
+        print(f"   Raw API response keys: {data.keys()}")
         
         # The API returns routes instead of features
         if 'routes' not in data or not data['routes']:
-            print(f"   ❌ Unexpected API response: {data}")
+            print(f"   Unexpected API response: {data}")
             raise ValueError(f"API response missing 'routes' field")
             
         route = data['routes'][0]
-        print(f"   🛣️ Route data keys: {route.keys()}")
+        print(f"   Route data keys: {route.keys()}")
         
         if 'summary' not in route:
-            print(f"   ❌ Route missing 'summary' field")
+            print(f"   Route missing 'summary' field")
             raise ValueError(f"API response missing 'summary' field")
             
         # Collect steps from all segments
         all_steps = []
         if 'segments' in route:
-            print(f"   🔢 Route has {len(route['segments'])} segments")
+            print(f"   Route has {len(route['segments'])} segments")
             for i, segment in enumerate(route['segments']):
                 if 'steps' in segment:
                     segment_steps = len(segment['steps'])
@@ -75,15 +75,15 @@ def get_route(coords: list, mode: str = "foot-walking"):
         
     except requests.exceptions.RequestException as e:
         error_msg = f"Network error: {e}"
-        print(f"   ❌ {error_msg}")
+        print(f"   {error_msg}")
         raise Exception(error_msg)
     except (KeyError, IndexError, ValueError) as e:
         error_msg = f"Error processing routing data: {e}"
-        print(f"   ❌ {error_msg}")
+        print(f"   {error_msg}")
         raise Exception(error_msg)
     except Exception as e:
         error_msg = f"Unexpected error: {e}"
-        print(f"   ❌ {error_msg}")
+        print(f"   {error_msg}")
         raise Exception(error_msg)
 
 def create_route_map(route_data: dict, pois: list = None, filename: str = "route_map.html") -> str:
@@ -101,12 +101,12 @@ def create_route_map(route_data: dict, pois: list = None, filename: str = "route
     try:
         import folium
     except ImportError:
-        print("❌ folium not installed. Install with: pip install folium")
+        print("folium not installed. Install with: pip install folium")
         return None
     
     geometry = route_data.get('geometry', [])
     if not geometry:
-        print("❌ No geometry data in route")
+        print("No geometry data in route")
         return None
     
     # Calculate center point
@@ -148,5 +148,5 @@ def create_route_map(route_data: dict, pois: list = None, filename: str = "route
     # Save map
     file_path = os.path.abspath(filename)
     m.save(file_path)
-    print(f"🗺️ Route map saved to: {file_path}")
+    print(f"Route map saved to: {file_path}")
     return file_path

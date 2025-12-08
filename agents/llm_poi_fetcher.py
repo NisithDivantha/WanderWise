@@ -29,9 +29,9 @@ def geocode_poi_with_geocoder(poi_name: str, location_context: str = "") -> dict
     
     for query in search_queries:
         try:
-            print(f"   🔍 Geocoding: '{query}'")
+            print(f"    Geocoding: '{query}'")
             result = geocode_location(query)
-            print(f"    Found coordinates: {result['lat']:.4f}, {result['lon']:.4f}")
+            print(f"        Found coordinates: {result['lat']:.4f}, {result['lon']:.4f}")
             return {
                 'lat': result['lat'],
                 'lon': result['lon'],
@@ -600,17 +600,17 @@ def fetch_pois_with_llm(location: str, limit: int = 15, travel_style: str = None
         source = coord_info.get('source', 'failed')
         
         print(f"\n{i+1}. {geocoded_indicator} {poi.get('name', 'Unknown')}")
-        print(f"   📍 Coordinates: {lat:.4f}, {lon:.4f} ({'geocoded by ' + source if coord_info.get('geocoded', False) else 'geocoding failed'})")
-        print(f"   📍 Category: {poi.get('category', 'unknown')}")
-        print(f"   ⏱️ Duration: {poi.get('estimated_visit_duration', 'unknown')}")
-        print(f"   ⭐ Significance: {poi.get('significance', 'medium')}")
+        print(f"Coordinates: {lat:.4f}, {lon:.4f} ({'geocoded by ' + source if coord_info.get('geocoded', False) else 'geocoding failed'})")
+        print(f"Category: {poi.get('category', 'unknown')}")
+        print(f"Duration: {poi.get('estimated_visit_duration', 'unknown')}")
+        print(f"Significance: {poi.get('significance', 'medium')}")
         desc = poi.get('description', '')[:150]
-        print(f"   📝 {desc}{'...' if len(poi.get('description', '')) > 150 else ''}")
+        print(f"{desc}{'...' if len(poi.get('description', '')) > 150 else ''}")
         
         if coord_info.get('geocoded', False):
             print(f"   🔍 Geocoded query: '{coord_info.get('query_used', 'N/A')}'")
     
-    print(f"\n📊 Geocoding Summary: {geocoded_count}/{len(formatted_pois)} POIs successfully geocoded")
+    print(f"\nGeocoding Summary: {geocoded_count}/{len(formatted_pois)} POIs successfully geocoded")
     
     return formatted_pois
     
@@ -619,15 +619,15 @@ def fetch_pois_hybrid(lat: float, lon: float, location_name: str,
                      radius: int = 15000, limit: int = 20) -> list:
     """Combine LLM-powered scraping with OpenTripMap API as fallback"""
     
-    print(f"\n🔄 Hybrid POI Fetching for {location_name}")
+    print(f"\nHybrid POI Fetching for {location_name}")
     
     # First use LLM scraping (prioritized) with proper geocoding
     try:
-        print(f"\n🤖 Using LLM discovery for {location_name}...")
+        print(f"\nUsing LLM discovery for {location_name}...")
         llm_pois = fetch_pois_with_llm(location_name, limit)
-        print(f"✅ Found {len(llm_pois)} POIs from LLM")
+        print(f"Found {len(llm_pois)} POIs from LLM")
     except Exception as e:
-        print(f"❌ LLM POI error: {e}")
+        print(f"LLM POI error: {e}")
         llm_pois = []
     
     # Use OpenTripMap as fallback if LLM didn't provide enough results
@@ -638,11 +638,11 @@ def fetch_pois_hybrid(lat: float, lon: float, location_name: str,
         from .poi_fetcher import fetch_pois  # Import original function
         
         try:
-            print(f"\n📡 Fetching {remaining_limit} additional POIs from OpenTripMap API...")
+            print(f"\nFetching {remaining_limit} additional POIs from OpenTripMap API...")
             otm_pois = fetch_pois(lat, lon, radius, "interesting_places", remaining_limit)
-            print(f"✅ Found {len(otm_pois)} POIs from OpenTripMap")
+            print(f"Found {len(otm_pois)} POIs from OpenTripMap")
         except Exception as e:
-            print(f"❌ OpenTripMap error: {e}")
+            print(f"OpenTripMap error: {e}")
             otm_pois = []
     
     # Combine with LLM results first, then OpenTripMap
@@ -668,9 +668,9 @@ def fetch_pois_hybrid(lat: float, lon: float, location_name: str,
     # Count geocoded POIs
     geocoded_count = len([p for p in llm_pois if p.get('llm_data', {}).get('geocoded', False)])
     
-    print(f"\n✅ Final result: {len(unique_pois)} unique POIs")
-    print(f"   📍 LLM POIs: {len(llm_pois)} ({geocoded_count} geocoded by proper geocoder)")
-    print(f"   📡 OpenTripMap POIs: {len(otm_pois)}")
+    print(f"\nFinal result: {len(unique_pois)} unique POIs")
+    print(f"LLM POIs: {len(llm_pois)} ({geocoded_count} geocoded by proper geocoder)")
+    print(f"OpenTripMap POIs: {len(otm_pois)}")
     
     return unique_pois[:limit]
 
@@ -772,7 +772,7 @@ def fetch_pois_hybrid_with_preferences(lat: float, lon: float, destination: str,
     """
     from .poi_fetcher import fetch_pois
     
-    print(f"\n🎯 Fetching POIs with {vacation_preferences.get('description', 'mixed')} preferences")
+    print(f"\nFetching POIs with {vacation_preferences.get('description', 'mixed')} preferences")
     
     all_pois = []
     
@@ -809,7 +809,7 @@ def fetch_pois_hybrid_with_preferences(lat: float, lon: float, destination: str,
         print(f"OpenTripMap error: {e}")
     
     # Step 2: Get LLM POIs with preferences
-    print("🤖 Step 2: LLM-based POI discovery with preferences...")
+    print("Step 2: LLM-based POI discovery with preferences...")
     try:
         # Create preference-aware prompt
         keywords = vacation_preferences.get('keywords', [])
@@ -822,14 +822,14 @@ def fetch_pois_hybrid_with_preferences(lat: float, lon: float, destination: str,
             description=vacation_preferences.get('description', ''),
             limit=max(5, limit - len(all_pois))
         )
-        print(f"   ✅ LLM Discovery: {len(llm_pois)} POIs")
+        print(f"   LLM Discovery: {len(llm_pois)} POIs")
         all_pois.extend(llm_pois)
         
     except Exception as e:
-        print(f"   ❌ LLM POI discovery error: {e}")
+        print(f"   LLM POI discovery error: {e}")
     
     # Step 3: Filter and deduplicate
-    print("🔍 Step 3: Filtering and deduplicating...")
+    print("Step 3: Filtering and deduplicating...")
     
     # Remove duplicates by name similarity
     unique_pois = remove_duplicate_pois(all_pois)
@@ -840,7 +840,7 @@ def fetch_pois_hybrid_with_preferences(lat: float, lon: float, destination: str,
     # Limit results
     final_pois = filtered_pois[:limit]
     
-    print(f"✅ Final result: {len(final_pois)} unique, preference-matched POIs")
+    print(f"Final result: {len(final_pois)} unique, preference-matched POIs")
     
     return final_pois
 
@@ -849,7 +849,7 @@ def fetch_pois_with_llm_preferences(destination: str, keywords: list = [], avoid
     Fetch POIs using LLM with specific vacation preferences
     """
     if not GEMINI_API_KEY:
-        print("⚠️ GEMINI_API_KEY not found, skipping LLM POI discovery")
+        print("GEMINI_API_KEY not found, skipping LLM POI discovery")
         return []
     
     try:
@@ -932,7 +932,7 @@ Format as a numbered list with clear separation between attractions."""
         return formatted_pois
         
     except Exception as e:
-        print(f"❌ LLM preferences POI fetch error: {e}")
+        print(f"     LLM preferences POI fetch error: {e}")
         return []
 
 def filter_pois_by_preferences(pois: list, vacation_preferences: dict) -> list:

@@ -20,25 +20,25 @@ def geocode_location(location: str):
     # Try Google Maps Geocoding first
     for i, search_term in enumerate(search_strategies):
         try:
-            print(f"🌍 Google Geocoding attempt {i+1}: '{search_term}'")
+            print(f"Google Geocoding attempt {i+1}: '{search_term}'")
             result = google_maps_geocode(search_term)
             if result:
-                print(f"✅ Google Success: {result['name']}")
+                print(f"Google Success: {result['name']}")
                 return result
         except Exception as e:
-            print(f"❌ Google error with '{search_term}': {e}")
+            print(f"Google error with '{search_term}': {e}")
             continue
 
     # Fallback to Nominatim
     for i, search_term in enumerate(search_strategies):
         try:
-            print(f"🔍 Nominatim Geocoding attempt {i+1}: '{search_term}'")
+            print(f"Nominatim Geocoding attempt {i+1}: '{search_term}'")
             result = nominatim_search(search_term)
             if result:
-                print(f"✅ Nominatim Success: {result['name']}")
+                print(f"Nominatim Success: {result['name']}")
                 return result
         except Exception as e:
-            print(f"❌ Nominatim error with '{search_term}': {e}")
+            print(f"Nominatim error with '{search_term}': {e}")
             continue
 
     raise ValueError(f"Could not geocode: {location}")
@@ -356,15 +356,15 @@ def test_geocoder():
         "Invalid Location 12345"
     ]
     
-    print("🧪 Testing Enhanced Nominatim Geocoder")
+    print("Testing Enhanced Nominatim Geocoder")
     print("=" * 50)
     
     for location in test_locations:
         try:
             result = geocode_location(location)
-            print(f"✅ {location} -> {result['name']} ({result['lat']:.4f}, {result['lon']:.4f})")
+            print(f"{location} -> {result['name']} ({result['lat']:.4f}, {result['lon']:.4f})")
         except Exception as e:
-            print(f"❌ {location} -> Failed: {e}")
+            print(f"{location} -> Failed: {e}")
         
         time.sleep(1)  # Rate limiting
 

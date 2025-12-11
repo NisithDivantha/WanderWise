@@ -20,7 +20,7 @@ def generate_smart_itinerary_with_llm(pois, hotels, duration, interests="general
     model = get_llm_model()
     
     if not model:
-        print("⚠️ No LLM available, falling back to basic itinerary generation")
+        print(" No LLM available, falling back to basic itinerary generation")
         return generate_day_by_day_itinerary(pois, datetime.now().strftime("%Y-%m-%d"))
     
     # Prepare POI data for LLM
@@ -118,7 +118,7 @@ Generate an engaging, practical itinerary that maximizes the travel experience!
 """
 
     try:
-        print("🧠 Generating intelligent itinerary with AI...")
+        print(" Generating intelligent itinerary with AI...")
         response = model.generate_content(prompt)
         
         # Try to parse JSON response
@@ -136,14 +136,14 @@ Generate an engaging, practical itinerary that maximizes the travel experience!
         
         try:
             itinerary = json.loads(response_text)
-            print(f"✅ Generated {len(itinerary)} days of intelligent itinerary")
+            print(f" Generated {len(itinerary)} days of intelligent itinerary")
             return itinerary
         except json.JSONDecodeError:
-            print("⚠️ LLM response not in valid JSON format, processing as text...")
+            print(" LLM response not in valid JSON format, processing as text...")
             return parse_text_itinerary(response_text, duration)
             
     except Exception as e:
-        print(f"⚠️ LLM itinerary generation failed: {e}")
+        print(f"LLM itinerary generation failed: {e}")
         print("Falling back to basic itinerary generation...")
         return generate_day_by_day_itinerary(pois, datetime.now().strftime("%Y-%m-%d"))
 

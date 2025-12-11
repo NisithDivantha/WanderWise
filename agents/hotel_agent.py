@@ -57,18 +57,18 @@ def find_hotels_google_places(destination: str, lat: float, lon: float) -> List[
             
             # Enrich with detailed information if place_id is available
             if place_id:
-                print(f"   📝 Enriching details for: {hotel['name']}")
+                print(f"Enriching details for: {hotel['name']}")
                 details = get_hotel_details_google_places(place_id)
                 if details and not details.get('error'):
                     hotel.update(details)
-                    print(f"   ✅ Added details: address, phone, reviews")
+                    print(f" Added details: address, phone, reviews")
             
             hotels.append(hotel)
         
         return hotels
         
     except Exception as e:
-        print(f"⚠️ Google Places hotel search failed: {e}")
+        print(f" Google Places hotel search failed: {e}")
         return []
 
 def get_hotel_details_google_places(place_id: str) -> Dict:
@@ -163,7 +163,7 @@ def enhance_hotel_with_llm(hotel: Dict, destination: str) -> Dict:
         return enhanced_hotel
         
     except Exception as e:
-        print(f"⚠️ LLM hotel enhancement failed: {e}")
+        print(f" LLM hotel enhancement failed: {e}")
         return hotel  # Return original if LLM fails
 
 def parse_llm_hotel_enhancement(response_text: str) -> Dict:
@@ -255,7 +255,7 @@ def find_hotels_with_llm(destination: str, vacation_type: str = "mixed") -> List
         return hotels
         
     except Exception as e:
-        print(f"⚠️ LLM hotel search failed: {e}")
+        print(f" LLM hotel search failed: {e}")
         return []
 
 def parse_llm_hotel_response(response_text: str, destination: str) -> List[Dict]:
@@ -379,15 +379,15 @@ def extract_neighborhood(text: str) -> str:
 def suggest_hotels(destination: str, lat: float, lon: float, vacation_type: str = "mixed") -> List[Dict]:
     """Main function to suggest hotels combining Google Places and LLM"""
     
-    print(f"\n🏨 Finding hotel recommendations for {destination}...")
-    print(f"   🎯 Vacation type: {vacation_type}")
+    print(f"\n Finding hotel recommendations for {destination}...")
+    print(f"   Vacation type: {vacation_type}")
         
     all_hotels = []
     
     # Try Google Places first (primary source)
     google_hotels = find_hotels_google_places(destination, lat, lon)
     if google_hotels:
-        print(f"   📍 Found {len(google_hotels)} hotels via Google Places")
+        print(f"   Found {len(google_hotels)} hotels via Google Places")
         
         # Enhance Google Places hotels with LLM if they lack details
         enhanced_hotels = []
@@ -398,25 +398,25 @@ def suggest_hotels(destination: str, lat: float, lon: float, vacation_type: str 
         all_hotels.extend(enhanced_hotels)
         enhanced_count = len([h for h in enhanced_hotels if h.get('llm_enhanced')])
         if enhanced_count > 0:
-            print(f"   🤖 Enhanced {enhanced_count} hotels with LLM")
+            print(f"   Enhanced {enhanced_count} hotels with LLM")
     
     # If we don't have enough hotels, use LLM as fallback
     if len(all_hotels) < 5:
-        print(f"   🔄 Need more hotels, using LLM fallback...")
+        print(f"   Need more hotels, using LLM fallback...")
         llm_hotels = find_hotels_with_llm(destination, vacation_type)
         if llm_hotels:
-            print(f"   🤖 Found {len(llm_hotels)} additional hotels via LLM")
+            print(f"   Found {len(llm_hotels)} additional hotels via LLM")
             all_hotels.extend(llm_hotels)
     
     if not all_hotels:
-        print("   ❌ No hotels found")
+        print("   No hotels found")
         return []
     
     # Remove duplicates and rank
     unique_hotels = remove_duplicate_hotels(all_hotels)
     ranked_hotels = rank_hotels(unique_hotels)
     
-    print(f"   ✅ Final recommendations: {len(ranked_hotels[:8])} hotels")
+    print(f"   Final recommendations: {len(ranked_hotels[:8])} hotels")
     return ranked_hotels[:8]  # Return top 8 hotels  
 
 def remove_duplicate_hotels(hotels: List[Dict]) -> List[Dict]:
@@ -466,10 +466,10 @@ def rank_hotels(hotels: List[Dict]) -> List[Dict]:
 def display_hotel_recommendations(hotels: List[Dict]):
     """Display hotel recommendations in a user-friendly format"""
     if not hotels:
-        print("\n❌ No hotel recommendations available")
+        print("\n No hotel recommendations available")
         return
     
-    print(f"\n🏨 Hotel Recommendations ({len(hotels)} found)")
+    print(f"\n Hotel Recommendations ({len(hotels)} found)")
     print("=" * 60)
     
     for i, hotel in enumerate(hotels, 1):

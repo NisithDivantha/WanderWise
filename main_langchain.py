@@ -23,18 +23,18 @@ def print_welcome():
     """Print welcome message and feature overview."""
     welcome_message = """
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                         🌍 Enhanced Travel Planner 🌍                        ║
+║                         Enhanced Travel Planner                              ║
 ║                        Powered by LangChain Orchestration                     ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║ 🚀 NEW FEATURES:                                                             ║
+║ NEW FEATURES:                                                                ║
 ║   • Parallel Agent Execution - POI and Hotel fetching run simultaneously    ║
 ║   • Real-time Monitoring - Track agent performance and status               ║
 ║   • Shared Memory System - Agents communicate via message passing           ║
 ║   • Enhanced Error Handling - Robust failure recovery                       ║
 ║   • Performance Metrics - Detailed execution timing and statistics          ║
 ║                                                                              ║
-║ 🤖 AGENTS:                                                                   ║
+║ AGENTS:                                                                      ║
 ║   • Geocoding Agent - Convert locations to coordinates                      ║
 ║   • POI Agent - Fetch points of interest from OpenTripMap                   ║
 ║   • LLM POI Agent - AI-powered attraction recommendations                    ║
@@ -57,7 +57,7 @@ def check_requirements():
     # Check Gemini API key
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        print("⚠️  Warning: GEMINI_API_KEY not found in environment variables.")
+        print("Warning: GEMINI_API_KEY not found in environment variables.")
         print("   LLM-based features will be disabled.")
         print("   Set your API key: export GEMINI_API_KEY='your-key-here'")
         requirements_met = False
@@ -67,9 +67,9 @@ def check_requirements():
         import langchain
         import langchain_core
         import google.generativeai
-        print(" LangChain and Gemini packages installed")
+        print("LangChain and Gemini packages installed")
     except ImportError as e:
-        print(f" Missing required package: {e}")
+        print(f"Missing required package: {e}")
         print("   Install with: pip install langchain langchain-core google-generativeai")
         requirements_met = False
     
@@ -78,7 +78,7 @@ def check_requirements():
 
 async def demo_trip_planning():
     """Demonstrate the enhanced travel planner with a sample trip."""
-    print("\n🎯 DEMONSTRATION: Planning a trip to Tokyo")
+    print("\nDEMONSTRATION: Planning a trip to Tokyo")
     print("=" * 60)
     
     # Initialize orchestrator
@@ -87,8 +87,8 @@ async def demo_trip_planning():
         model="gpt-4o-mini"
     )
     
-    print(" Starting enhanced planning process...")
-    print(" Watch the parallel execution of multiple agents!\n")
+    print("Starting enhanced planning process...")
+    print("Watch the parallel execution of multiple agents!\n")
     
     # Plan the trip
     result = await orchestrator.plan_trip_async(
@@ -98,33 +98,33 @@ async def demo_trip_planning():
     )
     
     if result["success"]:
-        print("\n✅ Trip planning completed successfully!")
+        print("\nTrip planning completed successfully!")
         
         # Show performance metrics
         performance = result.get("performance", {})
-        print(f"\n📈 Performance Metrics:")
-        print(f"   ⏱️  Total time: {performance.get('total_duration', 0):.2f} seconds")
-        print(f"   🔧 Tools used: {len(performance.get('tool_usage', {}))}")
-        print(f"   📊 Total events: {performance.get('total_events', 0)}")
+        print(f"\nPerformance Metrics:")
+        print(f"   Total time: {performance.get('total_duration', 0):.2f} seconds")
+        print(f"   Tools used: {len(performance.get('tool_usage', {}))}")
+        print(f"   Total events: {performance.get('total_events', 0)}")
         
         # Show agent participation
         state = result.get("state", {})
         agent_outputs = state.get("agent_outputs", {})
-        print(f"\n🤖 Agents participated:")
+        print(f"\nAgents participated:")
         for key, info in agent_outputs.items():
             agent = info.get("agent", "unknown")
             timestamp = info.get("timestamp", "")
             print(f"   • {agent}: updated {key} at {timestamp.split('T')[1][:8]}")
         
         # Show brief results
-        print(f"\n🎯 Results Summary:")
+        print(f"\nResults Summary:")
         pois = state.get("pois", [])
         hotels = state.get("hotels", [])
-        print(f"   🏛️  Found {len(pois)} points of interest")
-        print(f"   🏨 Found {len(hotels)} hotels")
+        print(f"   Found {len(pois)} points of interest")
+        print(f"   Found {len(hotels)} hotels")
         
         if pois:
-            print(f"\n🌟 Top attractions:")
+            print(f"\nTop attractions:")
             for i, poi in enumerate(pois[:3], 1):
                 name = poi.get("name", "Unknown")
                 rating = poi.get("rating", "N/A")
@@ -134,16 +134,16 @@ async def demo_trip_planning():
         final_summary = state.get("final_summary", "")
         if final_summary:
             preview = final_summary[:300] + "..." if len(final_summary) > 300 else final_summary
-            print(f"\n📝 Summary Preview:")
+            print(f"\nSummary Preview:")
             print(f"   {preview}")
         
     else:
-        print(f"\n❌ Trip planning failed: {result.get('error', 'Unknown error')}")
+        print(f"\nTrip planning failed: {result.get('error', 'Unknown error')}")
         
         # Show any errors that occurred
         errors = result.get("state", {}).get("errors", [])
         if errors:
-            print("\n🔍 Error details:")
+            print("\nError details:")
             for error in errors[-3:]:  # Show last 3 errors
                 print(f"   • {error.get('error', 'Unknown error')}")
 
@@ -151,21 +151,21 @@ async def demo_trip_planning():
 def show_usage():
     """Show usage instructions."""
     usage = """
-🚀 USAGE OPTIONS:
+USAGE OPTIONS:
 
-1️⃣  Interactive Mode (Recommended):
+1. Interactive Mode (Recommended):
    python main_langchain.py --interactive
    
-2️⃣  Command Line Mode:
+2. Command Line Mode:
    python main_langchain.py --location "Paris, France" --duration 5
    
-3️⃣  Demo Mode:
+3. Demo Mode:
    python main_langchain.py --demo
    
-4️⃣  Help:
+4. Help:
    python main_langchain.py --help
 
-📋 Available Options:
+Available Options:
    --interactive, -i    : Start interactive mode
    --location, -l       : Destination location
    --interests         : Travel interests (default: general tourism)
@@ -174,7 +174,7 @@ def show_usage():
    --model, -m        : OpenAI model (default: gpt-4o-mini)
    --output, -o       : Output directory (default: output)
 
-🌟 Interactive mode provides the best experience with real-time status updates!
+Interactive mode provides the best experience with real-time status updates!
     """
     print(usage)
 
@@ -218,21 +218,21 @@ def main():
     
     # Check requirements
     if not check_requirements():
-        print("\n❌ Please install missing requirements before continuing.")
+        print("\nPlease install missing requirements before continuing.")
         return
     
     # Handle different modes
     if args.demo:
-        print("🎭 Running demonstration mode...")
+        print("Running demonstration mode...")
         asyncio.run(demo_trip_planning())
     
     elif args.interactive or not args.location:
-        print("🎮 Starting interactive mode...")
+        print("Starting interactive mode...")
         cli = TravelPlannerCLI()
         asyncio.run(cli.interactive_mode())
     
     else:
-        print("💻 Running command-line mode...")
+        print("Running command-line mode...")
         
         async def run_planning():
             orchestrator = TravelPlannerOrchestrator(
@@ -240,9 +240,9 @@ def main():
                 model=args.model
             )
             
-            print(f"🎯 Planning trip to: {args.location}")
-            print(f"🎨 Interests: {args.interests}")
-            print(f"📅 Duration: {args.duration} days\n")
+            print(f"Planning trip to: {args.location}")
+            print(f"Interests: {args.interests}")
+            print(f"Duration: {args.duration} days\n")
             
             result = await orchestrator.plan_trip_async(
                 args.location, args.interests, args.duration

@@ -13,10 +13,6 @@ langchain-huggingface>=0.1.0
 transformers>=4.41.0
 torch>=2.0.0
 
-# Note: For fully open-source deployment, you can use:
-# - Hugging Face transformers with local models
-# - Ollama with local LLMs
-# - Any other LangChain-compatible LLM
 
 # Async support
 aiohttp>=3.12.15
